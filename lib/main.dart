@@ -1,6 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
 
-void main() {
+// Global variable to store the list of available cameras.
+List<CameraDescription> cameras = [];
+
+Future<void> main() async {
+  // Ensure that plugin services are initialized so that `availableCameras()`
+  // can be called before `runApp()`
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Obtain a list of the available cameras on the device.
+  try {
+    cameras = await availableCameras();
+  } on CameraException catch (e) {
+    // Log the error to the console.
+    // Consider showing a user-friendly error message.
+    print('Error initializing cameras: ${e.code} - ${e.description}');
+    // Depending on the error, you might want to exit the app
+    // or proceed without camera functionality.
+  }
+
   runApp(const MyApp());
 }
 
@@ -11,7 +30,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Eye Direction Array Client',
       theme: ThemeData(
         // This is the theme of your application.
         //
@@ -29,94 +48,137 @@ class MyApp extends StatelessWidget {
         // This works for code too, not just values: Most code changes can be
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const CameraScreen(), // Start with the camera screen
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class CameraScreen extends StatefulWidget {
+  const CameraScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<CameraScreen> createState() => _CameraScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _CameraScreenState extends State<CameraScreen> {
+  CameraController? _controller;
+  bool _isCameraInitialized = false;
+  CameraDescription? _selectedCamera; // Store the selected camera
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the camera only if cameras were found
+    if (cameras.isNotEmpty) {
+      // Select the front camera if available, otherwise the first camera
+      _selectedCamera = cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.front,
+        orElse: () => cameras.first, // Fallback to the first camera
+      );
+      _initializeCameraController(_selectedCamera!);
+    } else {
+      // Handle the case where no cameras are available
+      print('No cameras found on this device.');
+      // You might want to show a message to the user here
+    }
+  }
+
+  Future<void> _initializeCameraController(
+    CameraDescription cameraDescription,
+  ) async {
+    // Dispose of the old controller if it exists
+    await _controller?.dispose();
+
+    // Create a new controller
+    _controller = CameraController(
+      // Get a specific camera from the list of available cameras.
+      cameraDescription,
+      // Define the resolution to use.
+      ResolutionPreset.medium, // Start with medium, adjust later if needed
+      enableAudio: false, // We don't need audio
+      imageFormatGroup:
+          ImageFormatGroup.yuv420, // Commonly used format for processing
+    );
+
+    // Next, initialize the controller. This returns a Future.
+    try {
+      await _controller!.initialize();
+      // After initialization, check if the widget is still mounted before updating the state
+      if (!mounted) {
+        return;
+      }
+      // TODO: Lock exposure and focus here based on PoC results
+      // Example (needs refinement and error handling based on PoC):
+      // await _controller!.setExposureMode(ExposureMode.locked);
+      // await _controller!.setFocusMode(FocusMode.locked); // Remember focus lock might not work reliably
+
+      setState(() {
+        _isCameraInitialized = true;
+      });
+      print('Camera initialized successfully.');
+
+      // Start image stream
+      _controller!.startImageStream((CameraImage image) {
+        // TODO: Process image frame here for face detection
+        // Be mindful of performance. Process frames selectively if needed.
+        // Example: Only process every Nth frame or when not already processing.
+        // print('Received frame: ${image.width}x${image.height}'); // Uncomment for debugging if needed
+      });
+    } on CameraException catch (e) {
+      print(
+        'Error initializing camera controller: ${e.code} - ${e.description}',
+      );
+      // Handle initialization errors, maybe show a message to the user
+      // Consider retrying or allowing the user to select another camera
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = false; // Mark as not initialized on error
+        });
+      }
+    } catch (e) {
+      // Catch any other potential errors
+      print('An unexpected error occurred during camera initialization: $e');
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    // Dispose of the controller when the widget is disposed.
+    _controller?.dispose();
+    print('Camera controller disposed.');
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+    // Display camera preview if initialized, otherwise show loading or error message
+    if (!_isCameraInitialized ||
+        _controller == null ||
+        !_controller!.value.isInitialized) {
+      // Handle cases: no cameras, initialization error, or still initializing
+      return Scaffold(
+        appBar: AppBar(title: const Text('Initializing Camera...')),
+        body: Center(
+          child:
+              cameras.isEmpty
+                  ? const Text('No cameras found on this device.')
+                  : const CircularProgressIndicator(), // Show loading indicator while initializing
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      );
+    }
+
+    // Camera preview
+    return Scaffold(
+      appBar: AppBar(title: const Text('Eye Direction Client')),
+      body: CameraPreview(_controller!),
+      // TODO: Add controls or status display later
     );
   }
 }

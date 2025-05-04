@@ -15,7 +15,7 @@ alwaysApply: true
     },
     {
       "rule": "Client App Technology Stack (Primary Focus)",
-      "description": "Develop using **Flutter (Dart)** for cross-platform deployment on user's iOS and Huawei devices (target Android API 24+ compatibility). **Crucially dependent on finding/using a Flutter camera plugin (like 'advanced_camera') that allows STABLE, MANUAL CONTROL AND LOCKING of camera parameters (Exposure, Focus, White Balance)** - this needs constant verification. Use a lightweight on-device ML model (e.g., TensorFlow Lite) for robust direction detection (>5-10 FPS target on old devices)."
+      "description": "Develop using **Flutter (Dart)** for cross-platform deployment on user's iOS and Huawei devices (target Android API 24+ compatibility). **Crucially dependent on finding/using a Flutter camera plugin (like 'advanced_camera') that allows STABLE, MANUAL CONTROL AND LOCKING of camera parameters (Exposure, Focus, White Balance)** - this needs constant verification. **CURRENT TOP PRIORITY: Execute Camera PoC to validate this camera control capability.** Use a lightweight on-device ML model (e.g., TensorFlow Lite) for robust direction detection (>5-10 FPS target on old devices)."
     },
     {
       "rule": "Direction Detection Model Requirements",
@@ -23,7 +23,7 @@ alwaysApply: true
     },
     {
       "rule": "Server/Coordinator Logic",
-      "description": "Receives direction signals (Device ID, Status, Timestamp, Confidence) via local network. Implements state machine for different interaction modes (simple choice, sequential input). Parses signals based on duration, sequence, confidence, and **configurable parameters** (thresholds, signal weights, device roles, offset compensation). Sends UI update commands back to clients."
+      "description": "Receives direction signals (Device ID, Status, Timestamp, Confidence) - defined in [status_signal.dart](mdc:lib/models/status_signal.dart) (tested in [status_signal_test.dart](mdc:test/models/status_signal_test.dart)) - via local network. Implements state machine for different interaction modes (simple choice, sequential input). Parses signals based on duration, sequence, confidence, and **configurable parameters** (thresholds, signal weights, device roles, offset compensation). Sends UI update commands back to clients."
     },
     {
       "rule": "Configuration and Adaptability",
@@ -35,7 +35,7 @@ alwaysApply: true
     },
     {
       "rule": "Testing Strategy",
-      "description": "Crucial for this project: **Extensive on-device testing** on the target old iPhone and Huawei hardware is mandatory, focusing on camera control stability, model performance, and real-world direction detection accuracy. Implement unit tests for logic and integration tests for network communication."
+      "description": "Crucial for this project: **Extensive on-device testing** on the target old iPhone and Huawei hardware is mandatory, focusing on camera control stability, model performance, and real-world direction detection accuracy. Implement unit tests for logic ([status_signal_test.dart](mdc:test/models/status_signal_test.dart) is an example) and integration tests for network communication."
     },
     {
       "rule": "Privacy Implementation",
