@@ -2,26 +2,33 @@ import 'dart:ui'; // MockFace 需要 Rect
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:camera_poc/services/face_detection_service.dart'; // Import the service
+// 导入 FaceMesh 相关类
+import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detection.dart';
+// 导入 InputImage
+// import 'package:google_mlkit_commons/google_mlkit_commons.dart'; // 移除未使用导入
+import 'package:floweye/services/face_detection_service.dart'; // 修改包路径
 
-// Mock classes for ML Kit components
-class MockFaceDetector extends Mock implements FaceDetector {}
+// Mock FaceMeshDetector
+class MockFaceMeshDetector extends Mock implements FaceMeshDetector {}
 
 // InputImage is complex to mock fully, consider testing with real data if possible,
 // or mock specific properties needed for the test.
 class MockInputImage extends Mock implements InputImage {}
 
-class MockFace extends Mock implements Face {
-  // Example of mocking a property if needed by the service logic
+// Mock FaceMesh
+class MockFaceMesh extends Mock implements FaceMesh {
+  // Mock boundingBox if needed
   @override
   Rect get boundingBox => Rect.fromLTRB(10, 10, 110, 110);
 
-  // Need to mock other properties if accessed by the service (not needed for basic detectFaces)
+  // Mock points list if needed (e.g., return an empty list or a few mock points)
+  @override
+  List<FaceMeshPoint> get points => [];
 }
 
 void main() {
-  late MockFaceDetector mockFaceDetector;
+  // 修改为 MockFaceMeshDetector
+  late MockFaceMeshDetector mockFaceMeshDetector;
   late FaceDetectionService faceDetectionService;
 
   // Register fallback values for any() matcher if needed for complex types
@@ -30,92 +37,104 @@ void main() {
   // });
 
   setUp(() {
-    mockFaceDetector = MockFaceDetector();
+    // 修改为 MockFaceMeshDetector
+    mockFaceMeshDetector = MockFaceMeshDetector();
     // Inject the mock detector into the service for testing
-    faceDetectionService = FaceDetectionService(detector: mockFaceDetector);
+    faceDetectionService = FaceDetectionService(detector: mockFaceMeshDetector);
 
     // Ensure processImage is called with InputImage type
     registerFallbackValue(MockInputImage());
   });
 
   tearDown(() async {
-    // Verify that dispose closes the detector
-    // We might test this separately or ensure it's called in a real scenario test
+    // 可以在这里验证 mockFaceMeshDetector.close() 是否被调用
+    // when(() => mockFaceMeshDetector.close()).thenAnswer((_) async {});
+    // await faceDetectionService.dispose();
+    // verify(() => mockFaceMeshDetector.close()).called(1);
   });
 
   group('FaceDetectionService', () {
     test(
-      'detectFaces should return list of faces when faces are detected',
+      'detectFaces should return list of face meshes when meshes are detected',
       () async {
         // Arrange
         final inputImage = MockInputImage();
-        final expectedFaces = [MockFace(), MockFace()];
+        // 修改为 MockFaceMesh
+        final expectedMeshes = [MockFaceMesh(), MockFaceMesh()];
 
-        // Configure the mock detector to return expected faces when processImage is called
+        // Configure the mock detector to return expected meshes
         when(
-          () => mockFaceDetector.processImage(any()),
-        ) // Use any() matcher from mocktail
-        .thenAnswer((_) async => expectedFaces);
+          () => mockFaceMeshDetector.processImage(any()),
+        ).thenAnswer((_) async => expectedMeshes);
 
         // Act
-        final actualFaces = await faceDetectionService.detectFaces(inputImage);
+        final actualMeshes = await faceDetectionService.detectFaces(inputImage);
 
         // Assert
-        expect(actualFaces, equals(expectedFaces));
-        // Verify that processImage was called exactly once with the inputImage
-        verify(() => mockFaceDetector.processImage(inputImage)).called(1);
+        expect(actualMeshes, equals(expectedMeshes));
+        verify(() => mockFaceMeshDetector.processImage(inputImage)).called(1);
       },
     );
 
     test(
-      'detectFaces should return empty list when no faces are detected',
+      'detectFaces should return empty list when no meshes are detected',
       () async {
         // Arrange
         final inputImage = MockInputImage();
-        final expectedFaces = <Face>[]; // Empty list
+        // 修改为空的 FaceMesh 列表
+        final expectedMeshes = <FaceMesh>[]; // Empty list
 
         when(
-          () => mockFaceDetector.processImage(any()),
-        ).thenAnswer((_) async => expectedFaces);
+          () => mockFaceMeshDetector.processImage(any()),
+        ).thenAnswer((_) async => expectedMeshes);
 
         // Act
-        final actualFaces = await faceDetectionService.detectFaces(inputImage);
+        final actualMeshes = await faceDetectionService.detectFaces(inputImage);
 
         // Assert
-        expect(actualFaces, isEmpty);
-        verify(() => mockFaceDetector.processImage(inputImage)).called(1);
+        expect(actualMeshes, isEmpty);
+        verify(() => mockFaceMeshDetector.processImage(inputImage)).called(1);
       },
     );
 
-    test('detectFaces should re-throw exceptions from FaceDetector', () async {
+    test(
+      'detectFaces should re-throw exceptions from FaceMeshDetector',
+      () async {
+        // Arrange
+        final inputImage = MockInputImage();
+        final exception = Exception('ML Kit failed');
+
+        when(
+          () => mockFaceMeshDetector.processImage(any()),
+        ).thenThrow(exception);
+
+        // Act & Assert
+        expectLater(
+          () async => await faceDetectionService.detectFaces(inputImage),
+          throwsA(isA<Exception>()),
+        );
+        verify(() => mockFaceMeshDetector.processImage(inputImage)).called(1);
+      },
+    );
+
+    test('dispose should call close on the face mesh detector', () async {
       // Arrange
-      final inputImage = MockInputImage();
-      final exception = Exception('ML Kit failed');
-
-      when(() => mockFaceDetector.processImage(any())).thenThrow(exception);
-
-      // Act & Assert
-      // Use expectLater for async functions that throw
-      expectLater(
-        () async => await faceDetectionService.detectFaces(inputImage),
-        throwsA(isA<Exception>()), // Check if it throws any Exception
-      );
-      // Verify that processImage was called
-      verify(() => mockFaceDetector.processImage(inputImage)).called(1);
-    });
-
-    test('dispose should call close on the face detector', () async {
-      // Arrange
-      // Ensure the close method returns a Future<void>
-      when(() => mockFaceDetector.close()).thenAnswer((_) async {});
+      when(() => mockFaceMeshDetector.close()).thenAnswer((_) async {});
 
       // Act
       await faceDetectionService.dispose();
 
       // Assert
-      verify(() => mockFaceDetector.close()).called(1);
+      verify(() => mockFaceMeshDetector.close()).called(1);
     });
 
-    // TODO: Implement and test estimateEyeRegions
+    // TODO: 添加 isLookingAtScreen 方法的测试 (基于 FaceMesh)
+    // group('isLookingAtScreen', () {
+    //   test('should return true when mesh indicates looking forward (placeholder)', () {
+    //     final mockMesh = MockFaceMesh();
+    //     // TODO: Configure mockMesh properties if needed for the algorithm
+    //     expect(faceDetectionService.isLookingAtScreen(mockMesh), isTrue);
+    //   });
+    // });
   });
 }

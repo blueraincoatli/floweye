@@ -86,6 +86,11 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- 添加 ML Kit Face Mesh 模型依赖 -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="face_mesh" />
+
         <service
             android:name="androidx.camera.core.impl.MetadataHolderService"
             android:enabled="false"
@@ -98,6 +103,9 @@
             android:name="com.google.mlkit.common.internal.MlKitComponentDiscoveryService"
             android:directBootAware="true"
             android:exported="false" >
+            <meta-data
+                android:name="com.google.firebase.components:com.google.mlkit.vision.facemesh.internal.FaceMeshRegistrar"
+                android:value="com.google.firebase.components.ComponentRegistrar" />
             <meta-data
                 android:name="com.google.firebase.components:com.google.mlkit.vision.face.internal.FaceRegistrar"
                 android:value="com.google.firebase.components.ComponentRegistrar" />

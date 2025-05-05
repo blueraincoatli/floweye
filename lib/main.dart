@@ -4,12 +4,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart'; // For SystemChrome
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart'; // Import ML Kit
-import 'package:camera_poc/services/face_detection_service.dart'; // Import our service
+// import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart'; // 移除未使用导入
+import 'package:floweye/services/face_detection_service.dart'; // 更新导入路径
 // ignore: unused_import
-import 'package:camera_poc/utils/input_image_converter.dart'; // Import converter utility (to be created)
-import 'package:camera_poc/widgets/face_overlay_painter.dart'; // Import the painter
+import 'package:floweye/utils/input_image_converter.dart'; // 更新导入路径
+import 'package:floweye/widgets/face_overlay_painter.dart'; // 更新导入路径
 import 'package:shared_preferences/shared_preferences.dart'; // Import SharedPreferences
+import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detection.dart'; // 添加 FaceMesh 导入
 // For debugPrint
 // Import math for max function
 
@@ -115,7 +116,7 @@ class _CameraScreenState extends State<CameraScreen>
 
   // Face Detection Service
   late final FaceDetectionService _faceDetectionService;
-  List<Face> _detectedFaces = [];
+  List<FaceMesh> _detectedFaces = [];
   Size? _imageSize;
   InputImageRotation? _imageRotation;
   double _minExposure = 0.0;
@@ -453,12 +454,22 @@ class _CameraScreenState extends State<CameraScreen>
       );
 
       if (inputImage != null) {
-        final faces = await _faceDetectionService.detectFaces(inputImage);
+        final faceMeshes = await _faceDetectionService.detectFaces(inputImage);
         if (mounted) {
           setState(() {
-            _detectedFaces = faces;
-            // debugPrint("Faces detected: ${_detectedFaces.length}");
+            _detectedFaces = faceMeshes;
+            // 可以根据需要调整调试打印
+            // debugPrint("Face meshes detected: ${_detectedFaces.length}");
           });
+
+          // 如果检测到面部网格，调用 isLookingAtScreen (现在使用 FaceMesh)
+          if (_detectedFaces.isNotEmpty) {
+            final bool looking = _faceDetectionService.isLookingAtScreen(
+              _detectedFaces.first,
+            );
+            // TODO: 根据 isLookingAtScreen 的结果执行相应操作
+            debugPrint("Is looking at screen (FaceMesh): $looking");
+          }
         }
       } else {
         debugPrint("InputImage conversion failed."); // Use debugPrint
@@ -497,56 +508,30 @@ class _CameraScreenState extends State<CameraScreen>
       );
     }
 
-    // Camera preview is ready
-    // final mediaSize = MediaQuery.of(context).size;
-    // final scale = _calculatePreviewScale(mediaSize, _controller!.value); // 不再需要手动计算 scale
+    // 计算 scale
+    final Size canvasSize = MediaQuery.of(context).size;
+    final scale = _calculatePreviewScale(canvasSize, _controller!.value);
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Camera Preview (scaled) - 使用 FittedBox 替代 Transform.scale
-        Center(
-          child: FittedBox(
-            fit: BoxFit.cover, // 让预览覆盖整个区域
-            child: SizedBox(
-              // 需要给 FittedBox 一个有限的尺寸，CameraPreview 内部尺寸可能不确定
-              // 这里使用 previewSize，FittedBox 会根据 BoxFit.cover 调整
-              width:
-                  _controller!.value.previewSize?.height ??
-                  MediaQuery.of(context).size.width, // 预览通常是横向，宽高互换?
-              height:
-                  _controller!.value.previewSize?.width ??
-                  MediaQuery.of(context).size.height,
-              child: CameraPreview(_controller!),
-            ),
-          ),
+        // 相机预览
+        Transform.scale(
+          scale: scale, // 使用计算出的 scale
+          alignment: Alignment.center,
+          child: CameraPreview(_controller!),
         ),
-
-        // Face Overlay
+        // 绘制层
         if (_detectedFaces.isNotEmpty &&
             _imageSize != null &&
-            _imageRotation != null)
-          LayoutBuilder(
-            builder: (context, constraints) {
-              // 添加调试信息
-              debugPrint(
-                "LayoutBuilder: Building CustomPaint in ${currentOrientation == AppOrientation.landscape ? 'Landscape' : 'Portrait'}",
-              );
-              debugPrint(
-                "LayoutBuilder: constraints=${constraints.biggest}, imageSize=$_imageSize, imageRotation=$_imageRotation",
-              );
-              return CustomPaint(
-                size: constraints.biggest,
-                painter: FaceOverlayPainter(
-                  faces: _detectedFaces,
-                  imageSize: _imageSize!,
-                  imageRotation: _imageRotation!,
-                  cameraLensDirection: _selectedCamera!.lensDirection,
-                  canvasSize: constraints.biggest,
-                  scale: null, // 不再传递 scale，让 Painter 自己计算
-                ),
-              );
-            },
+            _imageRotation != null) // 确保所有参数有效
+          CustomPaint(
+            painter: FaceOverlayPainter(
+              faceMeshes: _detectedFaces,
+              imageSize: _imageSize!,
+              imageRotation: _imageRotation!,
+              cameraLensDirection: _selectedCamera!.lensDirection,
+            ),
           ),
 
         // Exposure Slider
@@ -558,7 +543,13 @@ class _CameraScreenState extends State<CameraScreen>
     );
   }
 
-  // double _calculatePreviewScale(Size screenSize, CameraValue cameraValue) { ... } // 移除不再使用的函数
+  double _calculatePreviewScale(Size screenSize, CameraValue cameraValue) {
+    // Implementation of _calculatePreviewScale method
+    // This method should return a scale factor based on the screen size and camera value
+    // For example, you can use the aspect ratio of the screen and camera to calculate the scale
+    // This is a placeholder and should be implemented based on your specific requirements
+    return 1.0; // Placeholder return, actual implementation needed
+  }
 
   Widget _buildExposureSlider() {
     if (!_isCameraInitialized || _controller == null) {

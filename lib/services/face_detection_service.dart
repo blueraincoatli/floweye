@@ -1,90 +1,68 @@
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detection.dart';
 import 'package:flutter/foundation.dart'; // For Rect if needed later, and debugPrint
+import 'dart:ui' show Size; // 导入Size类
+// import 'dart:math'; // 移除未使用的导入
 
 class FaceDetectionService {
-  final FaceDetector _faceDetector;
+  final FaceMeshDetector _faceMeshDetector;
 
-  // Constructor allowing injection of a FaceDetector instance.
-  // This is useful for testing with a mock detector.
-  FaceDetectionService({FaceDetector? detector})
-    : _faceDetector =
+  // 添加缺少的属性
+  List<FaceMesh>? _faceMeshes;
+  Size? _imageSize;
+
+  // Getters
+  List<FaceMesh>? get faceMeshes => _faceMeshes;
+  Size? get imageSize => _imageSize;
+
+  FaceDetectionService({FaceMeshDetector? detector})
+    : _faceMeshDetector =
           detector ??
-          FaceDetector(
-            options: FaceDetectorOptions(
-              performanceMode:
-                  FaceDetectorMode
-                      .accurate, // Use accurate mode for better precision
-              enableContours:
-                  true, // Enable facial contours for more precise detection
-              enableLandmarks:
-                  true, // Enable facial landmarks for better face feature detection
-              enableClassification:
-                  true, // Enable classification for detecting smiling, etc.
-              minFaceSize: 0.15, // Set minimum face size to 15% of the image
-            ),
+          FaceMeshDetector(
+            // 使用正确的枚举值初始化
+            option: FaceMeshDetectorOptions.faceMesh,
           );
 
-  /// Processes the given image to detect faces.
+  /// Processes the given image to detect face meshes.
   ///
-  /// Returns a list of [Face] objects found in the image.
+  /// Returns a list of [FaceMesh] objects found in the image.
   /// Returns an empty list if no faces are detected.
   /// Throws an exception if the detection process fails.
-  Future<List<Face>> detectFaces(InputImage inputImage) async {
+  Future<List<FaceMesh>> detectFaces(InputImage inputImage) async {
     try {
-      final List<Face> faces = await _faceDetector.processImage(inputImage);
-      return faces;
+      // 保存输入图像的尺寸
+      _imageSize = Size(
+        inputImage.metadata?.size.width ?? 0,
+        inputImage.metadata?.size.height ?? 0,
+      );
+
+      final List<FaceMesh> faceMeshes = await _faceMeshDetector.processImage(
+        inputImage,
+      );
+
+      // 保存检测到的面部网格
+      _faceMeshes = faceMeshes;
+
+      if (faceMeshes.isNotEmpty) {
+        final faceMesh = faceMeshes.first;
+        debugPrint(
+          'Detected Face Mesh with ${faceMesh.points.length} points. BoundingBox: ${faceMesh.boundingBox}',
+        );
+      }
+      return faceMeshes;
     } catch (e) {
-      // Log the error or handle it as needed
-      debugPrint('Error detecting faces: $e');
-      // Re-throw the exception to allow calling code to handle it
+      debugPrint('Error detecting face meshes: $e');
       rethrow;
     }
   }
 
-  /// Closes the face detector and releases resources.
+  bool isLookingAtScreen(FaceMesh faceMesh) {
+    debugPrint("isLookingAtScreen based on FaceMesh is not implemented yet.");
+    return true;
+  }
+
+  /// Closes the face mesh detector and releases resources.
   /// Should be called when the service is no longer needed.
   Future<void> dispose() async {
-    await _faceDetector.close();
+    await _faceMeshDetector.close();
   }
-
-  // TODO: Implement estimateEyeRegions method
-  /*
-  EyeRegions estimateEyeRegions(Face face) {
-    final Rect boundingBox = face.boundingBox;
-    // Add logic here to estimate left and right eye regions
-    // based on the bounding box dimensions and typical face proportions.
-    // This will likely involve some assumptions or heuristics.
-    // Example placeholder:
-    final double eyeRegionWidth = boundingBox.width * 0.2;
-    final double eyeRegionHeight = boundingBox.height * 0.15;
-    final double eyeOffsetY = boundingBox.height * 0.3;
-    final double leftEyeOffsetX = boundingBox.width * 0.2;
-    final double rightEyeOffsetX = boundingBox.width * 0.6;
-
-    final Rect leftEyeRect = Rect.fromLTWH(
-      boundingBox.left + leftEyeOffsetX,
-      boundingBox.top + eyeOffsetY,
-      eyeRegionWidth,
-      eyeRegionHeight,
-    );
-    final Rect rightEyeRect = Rect.fromLTWH(
-      boundingBox.left + rightEyeOffsetX,
-      boundingBox.top + eyeOffsetY,
-      eyeRegionWidth,
-      eyeRegionHeight,
-    );
-
-    return EyeRegions(leftEye: leftEyeRect, rightEye: rightEyeRect);
-  }
-  */
 }
-
-/*
-// Helper class to hold estimated eye regions
-class EyeRegions {
-  final Rect leftEye;
-  final Rect rightEye;
-
-  EyeRegions({required this.leftEye, required this.rightEye});
-}
-*/

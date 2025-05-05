@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart'; // 导入服务包
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detection.dart';
 import '../widgets/face_overlay_painter.dart'; // 确保路径正确
 import 'package:shared_preferences/shared_preferences.dart'; // 导入 SharedPreferences
+import 'dart:math' as math; // 引入math库
 // import '../main.dart'; // 移除未使用的导入
 
 // 添加 InputImageConverter 需要的导入 - 移动到 utils 文件后不再需要
 // import 'dart:io';
-// import 'package:flutter/foundation.dart';
 // import 'package:google_mlkit_commons/google_mlkit_commons.dart' as ml_commons;
 
 // 导入新的工具类
@@ -28,14 +28,10 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   List<CameraDescription>? _cameras;
   int _cameraIndex = 0;
   bool _isDetecting = false;
-  final FaceDetector _faceDetector = FaceDetector(
-    options: FaceDetectorOptions(
-      enableContours: true,
-      enableLandmarks: true,
-      performanceMode: FaceDetectorMode.fast,
-    ),
+  final FaceMeshDetector _faceMeshDetector = FaceMeshDetector(
+    option: FaceMeshDetectorOptions.faceMesh,
   );
-  List<Face> _faces = [];
+  List<FaceMesh> _faces = [];
   Size? _imageSize; // Store image size
   double _minExposure = 0.0;
   double _maxExposure = 0.0;
@@ -43,6 +39,9 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   bool _isLandscape = false; // 添加状态变量跟踪方向
   InputImageRotation _imageRotation =
       InputImageRotation.rotation270deg; // 默认前置摄像头竖屏
+  // 添加调试控制变量
+  bool _showDebugInfo = true; // 是否显示调试信息
+  bool _showMeshPoints = true; // 是否显示面部网格点
 
   @override
   void initState() {
@@ -130,11 +129,11 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
 
       // 获取曝光范围
       try {
-      _minExposure = await _controller!.getMinExposureOffset();
-      _maxExposure = await _controller!.getMaxExposureOffset();
-      // 可以设置一个初始曝光值，或者读取保存的值
-      _currentExposure = 0.0; // 默认中间值
-      await _controller!.setExposureOffset(_currentExposure);
+        _minExposure = await _controller!.getMinExposureOffset();
+        _maxExposure = await _controller!.getMaxExposureOffset();
+        // 可以设置一个初始曝光值，或者读取保存的值
+        _currentExposure = 0.0; // 默认中间值
+        await _controller!.setExposureOffset(_currentExposure);
         debugPrint(
           // 使用 debugPrint
           "Exposure range: $_minExposure to $_maxExposure. Current set to $_currentExposure",
@@ -155,33 +154,33 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       ); // 使用 debugPrint
 
       if (_isLandscape) {
-        // 横屏时，通常我们希望画面是正的
-        // 如果传感器是 90 或 270，需要对应锁定 landscapeRight 或 landscapeLeft
-        // 这里假设前置摄像头（通常 sensor=270）锁定为 landscapeLeft 可以得到正向预览
-        // 后置摄像头 (通常 sensor=90) 锁定为 landscapeRight
-        orientationToLock =
-            camera.lensDirection == CameraLensDirection.front
-                ? DeviceOrientation.landscapeLeft
-                : DeviceOrientation.landscapeRight;
-        // 更新 imageRotation 以匹配 ML Kit 的需要
-        // 注意：这里的逻辑可能需要根据实际设备和传感器方向进行调整
-        // InputImageRotation 需要的是图像相对于竖直向上的方向
+        // 横屏模式
         if (camera.lensDirection == CameraLensDirection.front) {
-          // 前置横屏，sensor 270，锁定 landscapeLeft
-          _imageRotation = InputImageRotation.rotation180deg;
+          // 前置摄像头横屏
+          orientationToLock = DeviceOrientation.landscapeLeft;
+          // 前置摄像头的传感器方向通常为270度
+          // 但在横屏模式中，我们需要调整为不同的旋转值
+          _imageRotation = InputImageRotation.rotation270deg; // 修改为270度旋转
         } else {
-          // 后置横屏，sensor 90，锁定 landscapeRight
-          _imageRotation = InputImageRotation.rotation0deg;
+          // 后置摄像头横屏
+          orientationToLock = DeviceOrientation.landscapeRight;
+          // 后置摄像头传感器方向通常为90度
+          _imageRotation = InputImageRotation.rotation90deg; // 修改为90度旋转
         }
+        debugPrint("横屏模式: 锁定方向=$orientationToLock, 图像旋转=$_imageRotation");
       } else {
-        // 竖屏时，锁定为 portraitUp
+        // 竖屏模式
         orientationToLock = DeviceOrientation.portraitUp;
-        // 更新 imageRotation
-        // 前置竖屏，sensor 270 -> rotation270deg
-        // 后置竖屏，sensor 90 -> rotation90deg
-        _imageRotation =
-            InputImageRotationValue.fromRawValue(sensorOrientation) ??
-            InputImageRotation.rotation0deg;
+
+        // 根据摄像头类型设置不同的旋转
+        if (camera.lensDirection == CameraLensDirection.front) {
+          // 前置摄像头竖屏的旋转值调整
+          _imageRotation = InputImageRotation.rotation90deg; // 修改为90度旋转
+        } else {
+          // 后置摄像头竖屏通常需要90度旋转
+          _imageRotation = InputImageRotation.rotation90deg;
+        }
+        debugPrint("竖屏模式: 锁定方向=$orientationToLock, 图像旋转=$_imageRotation");
       }
 
       await _controller!.lockCaptureOrientation(orientationToLock);
@@ -228,21 +227,25 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       if (_imageSize == null ||
           _imageSize!.width != image.width.toDouble() ||
           _imageSize!.height != image.height.toDouble()) {
+        // 对于旋转90/270度的情况，我们需要将宽高交换以匹配ML Kit的处理方式
+        bool isRotated =
+            _imageRotation == InputImageRotation.rotation90deg ||
+            _imageRotation == InputImageRotation.rotation270deg;
+
         if (mounted) {
           setState(() {
+            // 使用原始图像尺寸，确保和ML Kit使用相同的坐标系统
             _imageSize = Size(image.width.toDouble(), image.height.toDouble());
             debugPrint(
-              "Image size updated from stream: $_imageSize",
-            ); // 使用 debugPrint
+              "Image size updated from stream: $_imageSize, isRotated=$isRotated",
+            );
           });
         }
-        // 如果 imageSize 首次获取或发生变化，可能需要重新评估 painter
-        // 但由于 setState 已经调用，应该会自动重绘
       }
 
       // 确保 _imageSize 不为 null 才继续处理
       if (_imageSize == null) {
-        debugPrint("Waiting for image size..."); // 使用 debugPrint
+        debugPrint("Waiting for image size...");
         _isDetecting = false;
         return;
       }
@@ -254,17 +257,24 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       );
 
       if (inputImage != null) {
-        final faces = await _faceDetector.processImage(inputImage);
+        final faces = await _faceMeshDetector.processImage(inputImage);
         if (mounted) {
           setState(() {
             _faces = faces;
+            if (faces.isNotEmpty) {
+              // 输出第一个人脸的边界框信息，帮助调试
+              final box = faces.first.boundingBox;
+              debugPrint(
+                "Face detected: ${box.left},${box.top} - ${box.right},${box.bottom}",
+              );
+            }
           });
         }
       } else {
-        debugPrint("InputImage conversion failed."); // 使用 debugPrint
+        debugPrint("InputImage conversion failed.");
       }
     } catch (e) {
-      debugPrint("Error processing image: $e"); // 使用 debugPrint
+      debugPrint("Error processing image: $e");
     } finally {
       // 加一个小的延迟确保状态更新有机会完成，防止检测过于频繁
       await Future.delayed(const Duration(milliseconds: 50));
@@ -294,7 +304,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _controller?.stopImageStream(); // 确保流已停止
     _controller?.dispose();
-    _faceDetector.close();
+    _faceMeshDetector.close();
     // 退出页面时恢复自动旋转
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -401,11 +411,11 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                 if ((value - _currentExposure).abs() >
                     (_maxExposure - _minExposure) / 100) {
                   if (mounted) {
-                setState(() {
-                  _currentExposure = value;
-                });
+                    setState(() {
+                      _currentExposure = value;
+                    });
                   }
-                try {
+                  try {
                     // 使用 then 处理异步操作，不阻塞 UI
                     _controller
                         ?.setExposureOffset(value)
@@ -417,7 +427,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
                             "Error setting exposure async: $e",
                           ); // 使用 debugPrint
                         });
-                } catch (e) {
+                  } catch (e) {
                     // 同步错误（例如控制器无效）
                     debugPrint(
                       "Error setting exposure sync: $e",
@@ -451,113 +461,197 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
     );
   }
 
+  // 添加一个调试工具栏，可以切换不同的显示模式
+  Widget _debugControls() {
+    return Positioned(
+      top: 80,
+      right: 20,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.black54,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '调试信息',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+                Switch(
+                  value: _showDebugInfo,
+                  onChanged: (value) {
+                    setState(() {
+                      _showDebugInfo = value;
+                    });
+                  },
+                  activeColor: Colors.green,
+                ),
+              ],
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '网格点',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+                Switch(
+                  value: _showMeshPoints,
+                  onChanged: (value) {
+                    setState(() {
+                      _showMeshPoints = value;
+                    });
+                  },
+                  activeColor: Colors.green,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 在控制器为空或未初始化时显示加载指示器
     if (_controller == null || !_controller!.value.isInitialized) {
-      debugPrint(
-        "Build: Controller not ready, showing loading indicator.",
-      ); // 使用 debugPrint
+      debugPrint("Build: Controller not ready, showing loading indicator.");
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    debugPrint("Build: Controller ready, building UI."); // 使用 debugPrint
-    final size = MediaQuery.of(context).size;
-    var camera = _controller!.value;
+    debugPrint("Build: Controller ready, building UI.");
+    final screenSize = MediaQuery.of(context).size;
+    final camera = _controller!.value;
 
-    // 计算 scale 以适应屏幕
-    // 需要根据当前屏幕方向和相机预览图像的固有方向（通常是横向）来计算
-    // camera.aspectRatio 是预览图像的宽高比 (width/height)
-    // size.aspectRatio 是屏幕的宽高比 (width/height)
-    double scale = 1.0;
-    double cameraAspectRatio = camera.aspectRatio;
+    // 获取相机预览的原始宽高比
+    final double cameraAspectRatio = camera.aspectRatio;
 
-    // MLKit 返回的 imageSize 通常是传感器原始方向的尺寸
-    // 而 CameraPreview 渲染的是旋转后适应屏幕方向的图像
-    // CameraController.value.aspectRatio 应该是预览画面的实际比例
     debugPrint(
-      "Screen size: $size, Screen aspect ratio: ${size.aspectRatio}",
-    ); // 使用 debugPrint
-    debugPrint(
-      "Camera preview aspect ratio: $cameraAspectRatio",
-    ); // 使用 debugPrint
-
-    if (cameraAspectRatio > 0) {
-      // 防止除零
-      // 如果屏幕是竖屏，相机预览是横屏 (常见情况)
-      if (size.aspectRatio < 1 && cameraAspectRatio > 1) {
-        // scale = screenWidth / previewHeight = screenHeight*screenAspect / previewWidth/previewAspect
-        // scale = screenHeight / previewWidth  ( approximately)
-        scale = size.aspectRatio * cameraAspectRatio;
-      }
-      // 如果屏幕是横屏，相机预览也是横屏
-      else if (size.aspectRatio > 1 && cameraAspectRatio > 1) {
-        scale = size.aspectRatio / cameraAspectRatio;
-      }
-      // 如果屏幕是竖屏，相机预览也是竖屏 (不常见，但处理一下)
-      else if (size.aspectRatio < 1 && cameraAspectRatio < 1) {
-        scale = size.aspectRatio / cameraAspectRatio;
-      }
-      // 如果屏幕是横屏，相机预览是竖屏 (不常见)
-      else if (size.aspectRatio > 1 && cameraAspectRatio < 1) {
-        scale = size.aspectRatio * cameraAspectRatio; // ? 这个可能需要调整
-      }
-
-      // 确保 scale 不会小于 1 (防止缩小)
-    if (scale < 1) scale = 1 / scale;
-      debugPrint("Calculated scale for CameraPreview: $scale"); // 使用 debugPrint
-    } else {
-      debugPrint(
-        "Warning: Camera aspect ratio is zero or negative.",
-      ); // 使用 debugPrint
-    }
+      "Screen size: $screenSize, Screen aspect ratio: ${screenSize.aspectRatio}",
+    );
+    debugPrint("Camera preview aspect ratio: $cameraAspectRatio");
 
     return Scaffold(
-      // 移除 AppBar，让相机预览全屏
-      // appBar: AppBar(
-      //   title: const Text('Camera View'),
-      // ),
       body: Stack(
         fit: StackFit.expand,
         children: <Widget>[
-          // 使用 Transform.scale 保证预览填满屏幕，同时保持比例
+          // 使用简化的布局方式，尝试解决对齐问题
           Center(
-            child: Transform.scale(
-              scale: scale,
-              child: CameraPreview(_controller!),
+            child: AspectRatio(
+              aspectRatio: cameraAspectRatio,
+              child: ClipRect(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // 相机预览
+                    CameraPreview(_controller!),
+
+                    // 人脸覆盖层
+                    if (_faces.isNotEmpty &&
+                        _imageSize != null &&
+                        _controller != null &&
+                        _controller!.value.isInitialized &&
+                        mounted &&
+                        _showMeshPoints)
+                      CustomPaint(
+                        size: Size.infinite,
+                        painter: FaceOverlayPainter(
+                          faceMeshes: _faces,
+                          imageSize: _imageSize!,
+                          imageRotation: _imageRotation,
+                          cameraLensDirection:
+                              _cameras![_cameraIndex].lensDirection,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
-          // 绘制人脸框 - 确保所有依赖项都有效
-          if (_faces.isNotEmpty &&
-              _imageSize != null &&
-              _controller != null &&
-              _controller!.value.isInitialized &&
-              mounted) // 添加 mounted 检查
-            LayoutBuilder(
-              builder: (context, constraints) {
-                // 使用 LayoutBuilder 获取 CustomPaint 的实际尺寸
-                final Size canvasSize = constraints.biggest;
-                debugPrint(
-                  // 使用 debugPrint
-                  "CustomPaint canvas size from LayoutBuilder: $canvasSize",
-                );
-                return CustomPaint(
-                  size: canvasSize, // 明确传递尺寸
-              painter: FaceOverlayPainter(
-                faces: _faces,
-                    imageSize: _imageSize!, // 图像原始尺寸
-                    imageRotation: _imageRotation, // 使用状态变量中的旋转信息
-                cameraLensDirection: _cameras![_cameraIndex].lensDirection,
-                    canvasSize: canvasSize, // 传递画布尺寸给 Painter
-                    scale: scale, // 传递计算出的 scale 给 Painter
-              ),
-                );
-              },
-            ),
-          // 添加曝光调节滑块
+
+          // 曝光滑块
           _exposureSlider(),
-          // 添加方向切换按钮
+
+          // 方向切换按钮
           _orientationButton(),
+
+          // 添加调试信息标签
+          if (_showDebugInfo)
+            Positioned(
+              top: 20,
+              left: 20,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '方向: ${_isLandscape ? "横屏" : "竖屏"}',
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    Text(
+                      '相机: ${_cameras![_cameraIndex].lensDirection.toString()}',
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    Text(
+                      '旋转: $_imageRotation',
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    if (_imageSize != null)
+                      Text(
+                        '图像: ${_imageSize!.width.toInt()}x${_imageSize!.height.toInt()}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    Text(
+                      '屏幕: ${MediaQuery.of(context).size.width.toInt()}x${MediaQuery.of(context).size.height.toInt()}',
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    Text(
+                      '人脸: ${_faces.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                    if (_faces.isNotEmpty)
+                      Text(
+                        '人脸点数: ${_faces.first.points.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    Text(
+                      '坐标系: 直接映射(无旋转)',
+                      style: const TextStyle(
+                        color: Colors.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // 添加维度参考线 (如果开启调试)
+          if (_showDebugInfo)
+            CustomPaint(size: Size.infinite, painter: DimensionGuidesPainter()),
+
+          // 添加调试控制工具栏
+          _debugControls(),
         ],
       ),
     );
@@ -566,3 +660,38 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
 
 // 更新 InputImageConverter 以接受可选的 rotation - 此类已移至 utils 文件
 // class InputImageConverter { ... } // 删除整个类定义
+
+// 添加维度参考线绘制器
+class DimensionGuidesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Paint linePaint =
+        Paint()
+          ..color = Colors.white.withOpacity(0.5)
+          ..strokeWidth = 1.0
+          ..style = PaintingStyle.stroke;
+
+    // 绘制中心十字线
+    canvas.drawLine(
+      Offset(size.width / 2, 0),
+      Offset(size.width / 2, size.height),
+      linePaint,
+    );
+
+    canvas.drawLine(
+      Offset(0, size.height / 2),
+      Offset(size.width, size.height / 2),
+      linePaint,
+    );
+
+    // 绘制中心圆形
+    canvas.drawCircle(
+      Offset(size.width / 2, size.height / 2),
+      math.min(size.width, size.height) / 6,
+      linePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}

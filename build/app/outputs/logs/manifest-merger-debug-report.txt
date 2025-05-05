@@ -1,11 +1,13 @@
 -- Merging decision tree log ---
 application
-INJECTED from D:\floweye\android\app\src\main\AndroidManifest.xml:7:5-38:19
+INJECTED from D:\floweye\android\app\src\main\AndroidManifest.xml:7:5-44:19
 INJECTED from D:\floweye\android\app\src\debug\AndroidManifest.xml
 MERGED from [androidx.camera:camera-camera2:1.4.1] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\75157b45803b32360f0113fb9e3d6360\transformed\jetified-camera-camera2-1.4.1\AndroidManifest.xml:23:5-34:19
 MERGED from [androidx.camera:camera-camera2:1.4.1] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\75157b45803b32360f0113fb9e3d6360\transformed\jetified-camera-camera2-1.4.1\AndroidManifest.xml:23:5-34:19
 MERGED from [androidx.camera:camera-core:1.4.1] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\7f080ba455b4666b19e67b6cab4ecc1c\transformed\jetified-camera-core-1.4.1\AndroidManifest.xml:23:5-34:19
 MERGED from [androidx.camera:camera-core:1.4.1] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\7f080ba455b4666b19e67b6cab4ecc1c\transformed\jetified-camera-core-1.4.1\AndroidManifest.xml:23:5-34:19
+MERGED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:7:5-15:19
+MERGED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:7:5-15:19
 MERGED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:8:5-16:19
 MERGED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:8:5-16:19
 MERGED from [com.google.mlkit:vision-common:17.3.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\a05b5895d4441831cef9203768ec4801\transformed\jetified-vision-common-17.3.0\AndroidManifest.xml:8:5-16:19
@@ -45,8 +47,8 @@ MERGED from [com.google.android.odml:image:1.0.0-beta1] C:\Users\Hongyu Li\.grad
 	android:name
 		INJECTED from D:\floweye\android\app\src\main\AndroidManifest.xml
 manifest
-ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:1:1-50:12
-MERGED from D:\floweye\android\app\src\main\AndroidManifest.xml:1:1-50:12
+ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:1:1-56:12
+MERGED from D:\floweye\android\app\src\main\AndroidManifest.xml:1:1-56:12
 INJECTED from D:\floweye\android\app\src\debug\AndroidManifest.xml:1:1-7:12
 INJECTED from D:\floweye\android\app\src\debug\AndroidManifest.xml:1:1-7:12
 INJECTED from D:\floweye\android\app\src\debug\AndroidManifest.xml:1:1-7:12
@@ -58,15 +60,18 @@ MERGED from [androidx.camera:camera-camera2:1.4.1] C:\Users\Hongyu Li\.gradle\ca
 MERGED from [androidx.camera:camera-core:1.4.1] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\7f080ba455b4666b19e67b6cab4ecc1c\transformed\jetified-camera-core-1.4.1\AndroidManifest.xml:17:1-36:12
 MERGED from [:flutter_plugin_android_lifecycle] D:\floweye\build\flutter_plugin_android_lifecycle\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-7:12
 MERGED from [:google_mlkit_face_detection] D:\floweye\build\google_mlkit_face_detection\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-7:12
+MERGED from [:google_mlkit_face_mesh_detection] D:\floweye\build\google_mlkit_face_mesh_detection\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-7:12
 MERGED from [:google_mlkit_commons] D:\floweye\build\google_mlkit_commons\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-7:12
 MERGED from [:integration_test] D:\floweye\build\integration_test\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:7:1-12:12
 MERGED from [:video_player_android] D:\floweye\build\video_player_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-7:12
+MERGED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:2:1-17:12
 MERGED from [com.google.mlkit:face-detection:16.1.7] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\de6a9d5d48a7bf8ed6ba27ced1fedf16\transformed\jetified-face-detection-16.1.7\AndroidManifest.xml:2:1-8:12
 MERGED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:2:1-18:12
+MERGED from [com.google.mlkit:mediapipe-internal:17.0.0-beta9] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\47e630e374c6732e4358d747c2981e10\transformed\jetified-mediapipe-internal-17.0.0-beta9\AndroidManifest.xml:2:1-8:12
 MERGED from [com.google.mlkit:vision-common:17.3.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\a05b5895d4441831cef9203768ec4801\transformed\jetified-vision-common-17.3.0\AndroidManifest.xml:2:1-18:12
 MERGED from [com.google.mlkit:common:18.11.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\eb2477fd659c6578bc869f4d6edf4d2b\transformed\jetified-common-18.11.0\AndroidManifest.xml:2:1-26:12
 MERGED from [com.google.android.gms:play-services-base:18.5.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\f6fa56a75284f8e0ea5d27971291f441\transformed\jetified-play-services-base-18.5.0\AndroidManifest.xml:2:1-7:12
-MERGED from [com.google.mlkit:vision-interfaces:16.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\21346c7f0b7b2c52157ad7343a12c126\transformed\jetified-vision-interfaces-16.1.0\AndroidManifest.xml:2:1-7:12
+MERGED from [com.google.mlkit:vision-interfaces:16.3.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\3527dd3e0f3b6b8331bc60f513b96250\transformed\jetified-vision-interfaces-16.3.0\AndroidManifest.xml:2:1-7:12
 MERGED from [com.google.android.gms:play-services-tasks:18.2.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\e565694bd8e7fc6bedaaac67255baf8f\transformed\jetified-play-services-tasks-18.2.0\AndroidManifest.xml:2:1-5:12
 MERGED from [com.google.android.gms:play-services-basement:18.4.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\5568a35fadd1ad6d1c703f16a16e5540\transformed\jetified-play-services-basement-18.4.0\AndroidManifest.xml:2:1-9:12
 MERGED from [androidx.preference:preference:1.2.1] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\0098a6e93522fecc805d8900172003dc\transformed\preference-1.2.1\AndroidManifest.xml:17:1-24:12
@@ -168,17 +173,17 @@ MERGED from [:camera_android_camerax] D:\floweye\build\camera_android_camerax\in
 	android:name
 		ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:3:22-68
 queries
-ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:44:5-49:15
+ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:50:5-55:15
 intent#action:name:android.intent.action.PROCESS_TEXT+data:mimeType:text/plain
-ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:45:9-48:18
+ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:51:9-54:18
 action#android.intent.action.PROCESS_TEXT
-ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:46:13-72
+ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:52:13-72
 	android:name
-		ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:46:21-70
+		ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:52:21-70
 data
-ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:47:13-50
+ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:53:13-50
 	android:mimeType
-		ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:47:19-48
+		ADDED from D:\floweye\android\app\src\main\AndroidManifest.xml:53:19-48
 uses-permission#android.permission.INTERNET
 ADDED from D:\floweye\android\app\src\debug\AndroidManifest.xml:6:5-66
 MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\3fe589753a4aba9a36c72c795b877407\transformed\jetified-transport-backend-cct-2.3.3\AndroidManifest.xml:26:5-67
@@ -205,24 +210,30 @@ MERGED from [:flutter_plugin_android_lifecycle] D:\floweye\build\flutter_plugin_
 MERGED from [:flutter_plugin_android_lifecycle] D:\floweye\build\flutter_plugin_android_lifecycle\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
 MERGED from [:google_mlkit_face_detection] D:\floweye\build\google_mlkit_face_detection\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
 MERGED from [:google_mlkit_face_detection] D:\floweye\build\google_mlkit_face_detection\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
+MERGED from [:google_mlkit_face_mesh_detection] D:\floweye\build\google_mlkit_face_mesh_detection\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
+MERGED from [:google_mlkit_face_mesh_detection] D:\floweye\build\google_mlkit_face_mesh_detection\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
 MERGED from [:google_mlkit_commons] D:\floweye\build\google_mlkit_commons\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
 MERGED from [:google_mlkit_commons] D:\floweye\build\google_mlkit_commons\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
 MERGED from [:integration_test] D:\floweye\build\integration_test\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:10:5-44
 MERGED from [:integration_test] D:\floweye\build\integration_test\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:10:5-44
 MERGED from [:video_player_android] D:\floweye\build\video_player_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
 MERGED from [:video_player_android] D:\floweye\build\video_player_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
+MERGED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:5:5-44
+MERGED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:5:5-44
 MERGED from [com.google.mlkit:face-detection:16.1.7] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\de6a9d5d48a7bf8ed6ba27ced1fedf16\transformed\jetified-face-detection-16.1.7\AndroidManifest.xml:6:5-44
 MERGED from [com.google.mlkit:face-detection:16.1.7] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\de6a9d5d48a7bf8ed6ba27ced1fedf16\transformed\jetified-face-detection-16.1.7\AndroidManifest.xml:6:5-44
 MERGED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:6:5-44
 MERGED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:6:5-44
+MERGED from [com.google.mlkit:mediapipe-internal:17.0.0-beta9] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\47e630e374c6732e4358d747c2981e10\transformed\jetified-mediapipe-internal-17.0.0-beta9\AndroidManifest.xml:6:5-44
+MERGED from [com.google.mlkit:mediapipe-internal:17.0.0-beta9] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\47e630e374c6732e4358d747c2981e10\transformed\jetified-mediapipe-internal-17.0.0-beta9\AndroidManifest.xml:6:5-44
 MERGED from [com.google.mlkit:vision-common:17.3.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\a05b5895d4441831cef9203768ec4801\transformed\jetified-vision-common-17.3.0\AndroidManifest.xml:6:5-44
 MERGED from [com.google.mlkit:vision-common:17.3.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\a05b5895d4441831cef9203768ec4801\transformed\jetified-vision-common-17.3.0\AndroidManifest.xml:6:5-44
 MERGED from [com.google.mlkit:common:18.11.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\eb2477fd659c6578bc869f4d6edf4d2b\transformed\jetified-common-18.11.0\AndroidManifest.xml:6:5-44
 MERGED from [com.google.mlkit:common:18.11.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\eb2477fd659c6578bc869f4d6edf4d2b\transformed\jetified-common-18.11.0\AndroidManifest.xml:6:5-44
 MERGED from [com.google.android.gms:play-services-base:18.5.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\f6fa56a75284f8e0ea5d27971291f441\transformed\jetified-play-services-base-18.5.0\AndroidManifest.xml:3:5-44
 MERGED from [com.google.android.gms:play-services-base:18.5.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\f6fa56a75284f8e0ea5d27971291f441\transformed\jetified-play-services-base-18.5.0\AndroidManifest.xml:3:5-44
-MERGED from [com.google.mlkit:vision-interfaces:16.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\21346c7f0b7b2c52157ad7343a12c126\transformed\jetified-vision-interfaces-16.1.0\AndroidManifest.xml:5:5-44
-MERGED from [com.google.mlkit:vision-interfaces:16.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\21346c7f0b7b2c52157ad7343a12c126\transformed\jetified-vision-interfaces-16.1.0\AndroidManifest.xml:5:5-44
+MERGED from [com.google.mlkit:vision-interfaces:16.3.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\3527dd3e0f3b6b8331bc60f513b96250\transformed\jetified-vision-interfaces-16.3.0\AndroidManifest.xml:5:5-44
+MERGED from [com.google.mlkit:vision-interfaces:16.3.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\3527dd3e0f3b6b8331bc60f513b96250\transformed\jetified-vision-interfaces-16.3.0\AndroidManifest.xml:5:5-44
 MERGED from [com.google.android.gms:play-services-tasks:18.2.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\e565694bd8e7fc6bedaaac67255baf8f\transformed\jetified-play-services-tasks-18.2.0\AndroidManifest.xml:3:5-44
 MERGED from [com.google.android.gms:play-services-tasks:18.2.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\e565694bd8e7fc6bedaaac67255baf8f\transformed\jetified-play-services-tasks-18.2.0\AndroidManifest.xml:3:5-44
 MERGED from [com.google.android.gms:play-services-basement:18.4.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\5568a35fadd1ad6d1c703f16a16e5540\transformed\jetified-play-services-basement-18.4.0\AndroidManifest.xml:3:5-44
@@ -420,19 +431,27 @@ ADDED from [androidx.camera:camera-camera2:1.4.1] C:\Users\Hongyu Li\.gradle\cac
 	android:name
 		ADDED from [androidx.camera:camera-camera2:1.4.1] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\75157b45803b32360f0113fb9e3d6360\transformed\jetified-camera-camera2-1.4.1\AndroidManifest.xml:31:17-103
 service#com.google.mlkit.common.internal.MlKitComponentDiscoveryService
-ADDED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:9:9-15:19
+ADDED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:8:9-14:19
+MERGED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:9:9-15:19
+MERGED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:9:9-15:19
 MERGED from [com.google.mlkit:vision-common:17.3.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\a05b5895d4441831cef9203768ec4801\transformed\jetified-vision-common-17.3.0\AndroidManifest.xml:9:9-15:19
 MERGED from [com.google.mlkit:vision-common:17.3.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\a05b5895d4441831cef9203768ec4801\transformed\jetified-vision-common-17.3.0\AndroidManifest.xml:9:9-15:19
 MERGED from [com.google.mlkit:common:18.11.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\eb2477fd659c6578bc869f4d6edf4d2b\transformed\jetified-common-18.11.0\AndroidManifest.xml:15:9-23:19
 MERGED from [com.google.mlkit:common:18.11.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\eb2477fd659c6578bc869f4d6edf4d2b\transformed\jetified-common-18.11.0\AndroidManifest.xml:15:9-23:19
 	android:exported
-		ADDED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:11:13-37
+		ADDED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:10:13-37
 	tools:targetApi
 		ADDED from [com.google.mlkit:common:18.11.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\eb2477fd659c6578bc869f4d6edf4d2b\transformed\jetified-common-18.11.0\AndroidManifest.xml:19:13-32
 	android:directBootAware
 		ADDED from [com.google.mlkit:common:18.11.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\eb2477fd659c6578bc869f4d6edf4d2b\transformed\jetified-common-18.11.0\AndroidManifest.xml:17:13-43
 	android:name
-		ADDED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:10:13-91
+		ADDED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:9:13-91
+meta-data#com.google.firebase.components:com.google.mlkit.vision.facemesh.internal.FaceMeshRegistrar
+ADDED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:11:13-13:85
+	android:value
+		ADDED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:13:17-82
+	android:name
+		ADDED from [com.google.mlkit:face-mesh-detection:16.0.0-beta2] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\211efb62e9cef912db32042791ca4c87\transformed\jetified-face-mesh-detection-16.0.0-beta2\AndroidManifest.xml:12:17-122
 meta-data#com.google.firebase.components:com.google.mlkit.vision.face.internal.FaceRegistrar
 ADDED from [com.google.android.gms:play-services-mlkit-face-detection:17.1.0] C:\Users\Hongyu Li\.gradle\caches\8.10.2\transforms\4832077f8f88ed65695c31742dfa19d5\transformed\jetified-play-services-mlkit-face-detection-17.1.0\AndroidManifest.xml:12:13-14:85
 	android:value

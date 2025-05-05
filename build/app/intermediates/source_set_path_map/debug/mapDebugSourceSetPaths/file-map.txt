@@ -54,6 +54,7 @@ com.example.camera_poc.app-debug-52 D:\floweye\build\camera_android_camerax\inte
 com.example.camera_poc.app-debug-53 D:\floweye\build\flutter_plugin_android_lifecycle\intermediates\packaged_res\debug\packageDebugResources
 com.example.camera_poc.app-debug-54 D:\floweye\build\google_mlkit_commons\intermediates\packaged_res\debug\packageDebugResources
 com.example.camera_poc.app-debug-55 D:\floweye\build\google_mlkit_face_detection\intermediates\packaged_res\debug\packageDebugResources
-com.example.camera_poc.app-debug-56 D:\floweye\build\integration_test\intermediates\packaged_res\debug\packageDebugResources
-com.example.camera_poc.app-debug-57 D:\floweye\build\shared_preferences_android\intermediates\packaged_res\debug\packageDebugResources
-com.example.camera_poc.app-debug-58 D:\floweye\build\video_player_android\intermediates\packaged_res\debug\packageDebugResources
+com.example.camera_poc.app-debug-56 D:\floweye\build\google_mlkit_face_mesh_detection\intermediates\packaged_res\debug\packageDebugResources
+com.example.camera_poc.app-debug-57 D:\floweye\build\integration_test\intermediates\packaged_res\debug\packageDebugResources
+com.example.camera_poc.app-debug-58 D:\floweye\build\shared_preferences_android\intermediates\packaged_res\debug\packageDebugResources
+com.example.camera_poc.app-debug-59 D:\floweye\build\video_player_android\intermediates\packaged_res\debug\packageDebugResources
