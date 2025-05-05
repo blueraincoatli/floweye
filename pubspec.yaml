@@ -31,14 +31,26 @@ dependencies:
   flutter:
     sdk: flutter
   # Replace advanced_camera with the official camera plugin
-  camera: ^0.11.1 # Use the latest version from pub.dev
+  camera: ^0.11.0+1 # Use the latest version from pub.dev
   cupertino_icons: ^1.0.8
   # video_player: ^2.8.6 # Also needed by the example, add if testing example directly
   video_player: ^2.9.5
+  # google_ml_kit_face_detection: ^0.11.0 # Incorrect name
+  image: ^4.1.7 # 可能需要用于图像处理
+  # google_ml_kit_face_detection: # Remove the version with incorrect name and explicit source
+  #   hosted: https://pub.dev
+  #   version: ^0.11.0
+  google_mlkit_face_detection: ^0.13.1 # Use the correct package name and latest version
+  # google_mlkit_commons: ^0.8.1 # Add commons library for InputImageMetadata etc. - Version too low
+  google_mlkit_commons: ^0.11.0 # Use the version required by face_detection
+  shared_preferences: ^2.2.3 # 添加 shared_preferences 依赖
   
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test: # 如果还没有，添加集成测试依赖
+    sdk: flutter
+  mocktail: ^1.0.3 # 添加 mocktail 用于模拟对象
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
