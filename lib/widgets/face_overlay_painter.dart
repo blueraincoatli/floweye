@@ -5,7 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 // import 'package:google_mlkit_commons/google_mlkit_commons.dart';
 import 'package:google_mlkit_face_mesh_detection/google_mlkit_face_mesh_detection.dart';
-import 'dart:math' as math; // Import math for min
+// Import math for min
 
 class FaceOverlayPainter extends CustomPainter {
   final List<FaceMesh> faceMeshes;
