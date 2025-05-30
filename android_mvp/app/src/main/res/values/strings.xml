@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">FlowEye MVP</string>
+    <string name="camera_permission_required">需要摄像头权限才能使用视线追踪功能</string>
+    <string name="permission_denied">权限被拒绝</string>
+    <string name="mediapipe_init_failed">MediaPipe初始化失败</string>
+    <string name="camera_init_failed">摄像头初始化失败</string>
+    <string name="looking_at_yes">正在看向：是</string>
+    <string name="looking_at_no">正在看向：否</string>
+    <string name="looking_away">未看向任何选项</string>
+    <string name="face_detected">检测到人脸</string>
+    <string name="no_face_detected">未检测到人脸</string>
+</resources>

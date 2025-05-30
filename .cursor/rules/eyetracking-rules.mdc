@@ -1,0 +1,49 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+{
+  "rules": [
+    {
+      "rule": "Project Description and Goal",
+      "description": "Develop a low-cost, multi-device communication system ('Eye-Direction Array') for severely motor-impaired users. Users express intent ('yes'/'no', selections) by looking towards different mobile devices in an array. The system uses on-device visual processing to detect the *direction* of gaze towards each device's screen (not precise eye-tracking) and coordinates signals locally. Core principles: **Local-first (no internet for core function), Privacy (no image upload), Robustness, Adaptability (configurable), Performance on old devices**."
+    },
+    {
+      "rule": "Core Architecture",
+      "description": "Distributed system: Multiple **Client Apps** running on array devices (iOS, Android/HarmonyOS via Flutter) performing direction detection, and one **Server/Coordinator App** (can be Flutter App on mobile/PC, or native PC app) managing state, interpreting signals, and coordinating UI updates across clients. **Communication MUST use local network protocols** (MQTT preferred, e.g., local broker on server device)."
+    },
+    {
+      "rule": "Client App Technology Stack (Primary Focus)",
+      "description": "Develop using **Flutter (Dart)** for cross-platform deployment on user's iOS and Huawei devices (target Android API 24+ compatibility). **Crucially dependent on finding/using a Flutter camera plugin (like 'advanced_camera') that allows STABLE, MANUAL CONTROL AND LOCKING of camera parameters (Exposure, Focus, White Balance)** - this needs constant verification. **CURRENT TOP PRIORITY: Execute Camera PoC to validate this camera control capability.** Use a lightweight on-device ML model (e.g., TensorFlow Lite) for robust direction detection (>5-10 FPS target on old devices)."
+    },
+    {
+      "rule": "Direction Detection Model Requirements",
+      "description": "The client-side model should perform a binary classification: 'gaze towards this device's screen' vs 'not towards'. **Must account for camera-screen offset**. Needs robustness to varying light (with locked camera params) and minor occlusions (like nasal cannula). Prioritize **robustness and speed on old hardware** over pinpoint accuracy. Output should include a confidence score. Candidates: TinyFace+PFLD+Analysis, or MobileNet-SSD/YuNet+Pose+Analysis - requires testing."
+    },
+    {
+      "rule": "Server/Coordinator Logic",
+      "description": "Receives direction signals (Device ID, Status, Timestamp, Confidence) - defined in [status_signal.dart](mdc:lib/models/status_signal.dart) (tested in [status_signal_test.dart](mdc:test/models/status_signal_test.dart)) - via local network. Implements state machine for different interaction modes (simple choice, sequential input). Parses signals based on duration, sequence, confidence, and **configurable parameters** (thresholds, signal weights, device roles, offset compensation). Sends UI update commands back to clients."
+    },
+    {
+      "rule": "Configuration and Adaptability",
+      "description": "The system must be highly configurable by the caregiver via the Server/Coordinator App to adapt to individual user abilities and environment. Key adjustable parameters: gaze duration threshold, signal confidence threshold, head/eye signal weighting (if applicable), camera-screen offset/angle sensitivity, device roles in interaction modes."
+    },
+    {
+      "rule": "Code Style and Quality",
+      "description": "Follow standard Dart/Flutter effective coding practices. Emphasize **clear, readable, and maintainable code**, especially for camera control, state management, and network communication logic. Include meaningful comments for complex sections. Prioritize stability and error handling (graceful degradation where possible)."
+    },
+    {
+      "rule": "Testing Strategy",
+      "description": "Crucial for this project: **Extensive on-device testing** on the target old iPhone and Huawei hardware is mandatory, focusing on camera control stability, model performance, and real-world direction detection accuracy. Implement unit tests for logic ([status_signal_test.dart](mdc:test/models/status_signal_test.dart) is an example) and integration tests for network communication."
+    },
+    {
+      "rule": "Privacy Implementation",
+      "description": "**Strictly enforce data locality**. No raw camera images or derived facial features should ever leave the client device. Only anonymized status signals (direction detected: true/false, confidence, timestamp) are sent over the local network to the coordinator."
+    },
+    {
+      "rule": "Future Extensions - Keep Separate",
+      "description": "Features like IR camera support, advanced input methods, or optional cloud AI integration are **explicitly out of scope for the MVP/initial versions**. Keep core logic clean and focused on the local, vision-based multi-device array."
+    }
+  ]
+}

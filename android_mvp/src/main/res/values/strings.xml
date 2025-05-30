@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FlowEye MVP</string>
+    <string name="yes_button">是</string>
+    <string name="no_button">否</string>
+    <string name="camera_permission_required">需要摄像头权限来检测视线</string>
+    <string name="camera_permission_denied">摄像头权限被拒绝</string>
+    <string name="looking_at_yes">正在看向：是</string>
+    <string name="looking_at_no">正在看向：否</string>
+    <string name="looking_away">未看向任何选项</string>
+    <string name="detection_unstable">检测不稳定</string>
+    <string name="confidence">置信度: %.2f</string>
+</resources>
