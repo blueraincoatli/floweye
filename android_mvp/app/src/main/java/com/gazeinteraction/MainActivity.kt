@@ -65,6 +65,20 @@ class MainActivity : AppCompatActivity(),
     private var faceMeshOverlay: FaceMeshOverlayView? = null
     private var isDebugMode = false
 
+    private val debugSurfaceCallback = object : android.view.SurfaceHolder.Callback {
+        override fun surfaceCreated(holder: android.view.SurfaceHolder) {
+            if (::cameraManager.isInitialized) {
+                cameraManager.setPreviewSurface(holder.surface)
+            }
+        }
+        override fun surfaceChanged(holder: android.view.SurfaceHolder, fmt: Int, w: Int, h: Int) {}
+        override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
+            if (::cameraManager.isInitialized) {
+                cameraManager.setPreviewSurface(null)
+            }
+        }
+    }
+
     // ---------- 核心组件 ----------
     private lateinit var cameraManager: CameraManager
     private lateinit var faceLandmarkerHelper: FaceLandmarkerHelper
@@ -156,26 +170,16 @@ class MainActivity : AppCompatActivity(),
         isDebugMode = !isDebugMode
         debugPanel?.visibility = if (isDebugMode) View.VISIBLE else View.GONE
         if (isDebugMode) {
-            debugSurfaceView?.holder?.addCallback(object : android.view.SurfaceHolder.Callback {
-                override fun surfaceCreated(holder: android.view.SurfaceHolder) {
-                    if (::cameraManager.isInitialized) {
-                        cameraManager.setPreviewSurface(holder.surface)
-                    }
-                }
-                override fun surfaceChanged(holder: android.view.SurfaceHolder, fmt: Int, w: Int, h: Int) {}
-                override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
-                    if (::cameraManager.isInitialized) {
-                        cameraManager.setPreviewSurface(null)
-                    }
-                }
-            })
+            debugSurfaceView?.holder?.removeCallback(debugSurfaceCallback)
+            debugSurfaceView?.holder?.addCallback(debugSurfaceCallback)
         } else {
+            debugSurfaceView?.holder?.removeCallback(debugSurfaceCallback)
             if (::cameraManager.isInitialized) {
                 cameraManager.setPreviewSurface(null)
             }
             faceMeshOverlay?.clear()
         }
-        Toast.makeText(this, if (isDebugMode) "调试模式已开启" else "调试模式已关闭", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, if (isDebugMode) getString(R.string.debug_mode_on) else getString(R.string.debug_mode_off), Toast.LENGTH_SHORT).show()
     }
 
     private fun generateDeviceId() {
@@ -251,11 +255,7 @@ class MainActivity : AppCompatActivity(),
                 if (resultBundle.results.faceLandmarks().isNotEmpty()) {
                     val landmarks = resultBundle.results.faceLandmarks()[0].landmarkList()
                     runOnUiThread {
-                        faceMeshOverlay?.updateLandmarks(
-                            landmarks,
-                            resultBundle.inputImageWidth,
-                            resultBundle.inputImageHeight
-                        )
+                        faceMeshOverlay?.updateLandmarks(landmarks)
                     }
                 } else {
                     runOnUiThread { faceMeshOverlay?.clear() }

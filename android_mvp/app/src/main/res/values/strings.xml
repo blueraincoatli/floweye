@@ -29,4 +29,8 @@
     <string name="error_mediapipe_init">视线检测初始化失败</string>
     <string name="error_mqtt_connection">网络连接失败</string>
     <string name="error_face_not_detected">未检测到人脸</string>
+
+    <!-- 调试模式 -->
+    <string name="debug_mode_on">调试模式已开启</string>
+    <string name="debug_mode_off">调试模式已关闭</string>
 </resources>

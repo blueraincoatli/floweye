@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/debugPanel"
+    android:layout_width="160dp"
+    android:layout_height="120dp"
+    android:visibility="gone"
+    android:layout_margin="12dp"
+    app:layout_constraintTop_toBottomOf="@id/statusLayout"
+    app:layout_constraintStart_toStartOf="parent">
+
+    <SurfaceView
+        android:id="@+id/debugSurfaceView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <com.gazeinteraction.debug.FaceMeshOverlayView
+        android:id="@+id/faceMeshOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+</FrameLayout>

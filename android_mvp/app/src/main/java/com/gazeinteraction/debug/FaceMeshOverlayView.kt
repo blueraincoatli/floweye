@@ -27,8 +27,15 @@ class FaceMeshOverlayView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private var landmarks: List<NormalizedLandmark> = emptyList()
-    private var imageWidth: Int = 1
-    private var imageHeight: Int = 1
+
+    // 缓存坐标数组，避免 onDraw 每帧分配
+    private var cachedPoints = FloatArray(0)
+
+    // 缓存边界框（在 updateLandmarks 时预计算）
+    private var boundsMinX = 0f
+    private var boundsMaxX = 0f
+    private var boundsMinY = 0f
+    private var boundsMaxY = 0f
 
     // 画笔定义
     private val eyePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -65,14 +72,32 @@ class FaceMeshOverlayView @JvmOverloads constructor(
      * 更新人脸关键点数据并触发重绘。
      * 在 UI 线程调用。
      */
-    fun updateLandmarks(
-        landmarks: List<NormalizedLandmark>,
-        imageWidth: Int,
-        imageHeight: Int
-    ) {
+    fun updateLandmarks(landmarks: List<NormalizedLandmark>) {
         this.landmarks = landmarks
-        this.imageWidth = imageWidth.coerceAtLeast(1)
-        this.imageHeight = imageHeight.coerceAtLeast(1)
+
+        // 预分配/复用坐标缓存
+        val needed = landmarks.size * 2
+        if (cachedPoints.size < needed) {
+            cachedPoints = FloatArray(needed)
+        }
+
+        // 预计算坐标映射和边界框
+        boundsMinX = 1f
+        boundsMaxX = 0f
+        boundsMinY = 1f
+        boundsMaxY = 0f
+        for (i in landmarks.indices) {
+            val lm = landmarks[i]
+            val nx = 1.0f - lm.x()
+            val ny = lm.y()
+            cachedPoints[i * 2] = nx
+            cachedPoints[i * 2 + 1] = ny
+            if (nx < boundsMinX) boundsMinX = nx
+            if (nx > boundsMaxX) boundsMaxX = nx
+            if (ny < boundsMinY) boundsMinY = ny
+            if (ny > boundsMaxY) boundsMaxY = ny
+        }
+
         invalidate()
     }
 
@@ -90,71 +115,44 @@ class FaceMeshOverlayView @JvmOverloads constructor(
         val viewH = height.toFloat()
         if (viewW <= 0f || viewH <= 0f) return
 
-        // 计算边界框
-        var minX = 1f
-        var maxX = 0f
-        var minY = 1f
-        var maxY = 0f
-
-        // 先映射所有点并找到边界
-        val points = FloatArray(landmarks.size * 2)
-        for (i in landmarks.indices) {
-            val lm = landmarks[i]
-            // 前置摄像头镜像翻转
-            val nx = 1.0f - lm.x()
-            val ny = lm.y()
-            points[i * 2] = nx * viewW
-            points[i * 2 + 1] = ny * viewH
-
-            if (nx < minX) minX = nx
-            if (nx > maxX) maxX = nx
-            if (ny < minY) minY = ny
-            if (ny > maxY) maxY = ny
-        }
-
-        // 绘制边界框
+        // 绘制边界框（使用预计算的 bounds）
         canvas.drawRect(
-            minX * viewW, minY * viewH,
-            maxX * viewW, maxY * viewH,
+            boundsMinX * viewW, boundsMinY * viewH,
+            boundsMaxX * viewW, boundsMaxY * viewH,
             boxPaint
         )
 
         // 按区域绘制关键点
         for (i in landmarks.indices) {
-            val x = points[i * 2]
-            val y = points[i * 2 + 1]
-
-            val (paint, radius) = getPaintForIndex(i)
-            canvas.drawCircle(x, y, radius, paint)
+            val x = cachedPoints[i * 2] * viewW
+            val y = cachedPoints[i * 2 + 1] * viewH
+            drawLandmark(canvas, i, x, y)
         }
     }
 
     /**
-     * 根据关键点索引返回对应的画笔和半径。
-     * 索引范围参照 MediaPipe Face Landmarker 标准定义。
+     * 根据关键点索引直接绘制到 canvas，避免创建 Pair 对象。
      */
-    private fun getPaintForIndex(index: Int): Pair<Paint, Float> {
-        return when {
-            // 虹膜/瞳孔（核心关键点，最醒目）
-            index in 468..477 -> irisPaint to 4f
+    private fun drawLandmark(canvas: Canvas, index: Int, x: Float, y: Float) {
+        when {
+            index in 468..477 -> canvas.drawCircle(x, y, 4f, irisPaint)
 
-            // 右眼区域
-            index in 33..42 || index in 133..154 || index in 159..168 -> eyePaint to 2.5f
+            index in 33..42 || index in 133..154 || index in 159..168
+                -> canvas.drawCircle(x, y, 2.5f, eyePaint)
 
-            // 左眼区域
-            index in 263..272 || index in 362..381 || index in 385..394 -> eyePaint to 2.5f
+            index in 263..272 || index in 362..381 || index in 385..394
+                -> canvas.drawCircle(x, y, 2.5f, eyePaint)
 
-            // 鼻子区域
-            index in 1..32 || index in 97..132 -> nosePaint to 2f
+            index in 1..32 || index in 97..132
+                -> canvas.drawCircle(x, y, 2f, nosePaint)
 
-            // 嘴唇区域
-            index in 61..96 -> lipPaint to 2f
+            index in 61..96
+                -> canvas.drawCircle(x, y, 2f, lipPaint)
 
-            // 眉毛区域
-            index in 296..334 || index in 336..346 -> eyebrowPaint to 2f
+            index in 296..334 || index in 336..346
+                -> canvas.drawCircle(x, y, 2f, eyebrowPaint)
 
-            // 其他点
-            else -> defaultPaint to 1f
+            else -> canvas.drawCircle(x, y, 1f, defaultPaint)
         }
     }
 }

@@ -56,10 +56,16 @@ class CameraManager(context: Context) {
 
     /**
      * 设置调试预览 Surface。
-     * 在 createCaptureSession 时会同时输出到该 Surface。
+     * 若摄像头正在运行，会重建 CaptureSession 以包含/移除该 Surface。
      */
     fun setPreviewSurface(surface: Surface?) {
+        if (previewSurface == surface) return
         previewSurface = surface
+        if (isCapturing && cameraDevice != null) {
+            captureSession?.close()
+            captureSession = null
+            createCaptureSession()
+        }
     }
 
     /**
@@ -215,7 +221,7 @@ class CameraManager(context: Context) {
                 }, backgroundHandler)
             }
             
-            val surfaces = mutableListOf(imageReader?.surface)
+            val surfaces = listOfNotNull(imageReader?.surface).toMutableList()
             previewSurface?.let { surfaces.add(it) }
             
             cameraDevice?.createCaptureSession(
@@ -246,6 +252,7 @@ class CameraManager(context: Context) {
         try {
             val requestBuilder = cameraDevice?.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
             requestBuilder?.addTarget(imageReader?.surface ?: return)
+            previewSurface?.let { requestBuilder?.addTarget(it) }
             
             // 针对华为设备的关键配置
             configureForHuaweiDevice(requestBuilder)
