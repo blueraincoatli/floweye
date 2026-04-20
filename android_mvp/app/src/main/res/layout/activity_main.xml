@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_dark"
+    tools:context=".MainActivity">
+
+    <!-- 顶部状态栏 -->
+    <LinearLayout
+        android:id="@+id/statusLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="10dp"
+        android:gravity="center"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/cameraStatus"
+            style="@style/StatusTextStyle"
+            android:text="@string/initializing_camera"
+            android:layout_marginEnd="10dp" />
+
+        <TextView
+            android:id="@+id/mediapipeStatus"
+            style="@style/StatusTextStyle"
+            android:text="@string/initializing_mediapipe"
+            android:layout_marginEnd="10dp" />
+
+        <TextView
+            android:id="@+id/mqttStatus"
+            style="@style/StatusTextStyle"
+            android:text="@string/connecting_mqtt" />
+    </LinearLayout>
+
+    <!-- 底部信息区域 -->
+    <LinearLayout
+        android:id="@+id/bottomInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:gravity="center"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/gazeStatus"
+            style="@style/StatusTextStyle"
+            android:text="@string/no_gaze_detected"
+            android:textSize="18sp"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/confidenceText"
+            style="@style/StatusTextStyle"
+            android:text="置信度: 0%"
+            android:textSize="14sp"
+            android:layout_marginBottom="2dp" />
+
+        <TextView
+            android:id="@+id/deviceIdText"
+            style="@style/StatusTextStyle"
+            android:text="设备ID: 未设置"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!--
+        按钮容器 - 竖屏专用：上下排列，各占约 50% 高度
+        文字通过 autoSize 自动缩放以填满按钮
+    -->
+    <LinearLayout
+        android:id="@+id/buttonContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:padding="12dp"
+        app:layout_constraintTop_toBottomOf="@id/statusLayout"
+        app:layout_constraintBottom_toTopOf="@id/bottomInfo">
+
+        <TextView
+            android:id="@+id/yesButton"
+            style="@style/LargeButtonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginBottom="8dp"
+            android:text="@string/yes_button"
+            android:background="@drawable/btn_yes_normal" />
+
+        <TextView
+            android:id="@+id/noButton"
+            style="@style/LargeButtonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginTop="8dp"
+            android:text="@string/no_button"
+            android:background="@drawable/btn_no_normal" />
+    </LinearLayout>
+
+    <!-- 校准按钮（浮动） -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/settingsButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="12dp"
+        android:src="@android:drawable/ic_menu_preferences"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

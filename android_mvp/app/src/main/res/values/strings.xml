@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">视线交互助手</string>
+    
+    <!-- 按钮文本 -->
+    <string name="yes_button">是</string>
+    <string name="no_button">否</string>
+    
+    <!-- 状态提示 -->
+    <string name="camera_permission_required">需要摄像头权限才能使用视线检测功能</string>
+    <string name="grant_permission">授予权限</string>
+    <string name="gaze_detected">检测到注视</string>
+    <string name="no_gaze_detected">未检测到注视</string>
+    <string name="initializing_camera">正在初始化摄像头...</string>
+    <string name="initializing_mediapipe">正在初始化视线检测...</string>
+    <string name="connecting_mqtt">正在连接网络...</string>
+    <string name="ready">就绪</string>
+    
+    <!-- 设置 -->
+    <string name="settings">设置</string>
+    <string name="mqtt_broker_host">MQTT服务器地址</string>
+    <string name="mqtt_broker_port">MQTT端口</string>
+    <string name="device_id">设备ID</string>
+    <string name="confidence_threshold">置信度阈值</string>
+    <string name="calibrate">校准</string>
+    
+    <!-- 错误信息 -->
+    <string name="error_camera_init">摄像头初始化失败</string>
+    <string name="error_mediapipe_init">视线检测初始化失败</string>
+    <string name="error_mqtt_connection">网络连接失败</string>
+    <string name="error_face_not_detected">未检测到人脸</string>
+</resources>

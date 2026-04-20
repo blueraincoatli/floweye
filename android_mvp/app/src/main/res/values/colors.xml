@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主要颜色 -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- 应用特定颜色 -->
+    <color name="primary_blue">#FF2196F3</color>
+    <color name="primary_green">#FF4CAF50</color>
+    <color name="primary_red">#FFF44336</color>
+
+    <!--
+        按钮颜色 - 低饱和度柔和配色
+        原则：降低饱和度、避免纯黑纯白，减少视觉疲劳
+    -->
+    <!-- "是"按钮：深苔绿 → 柔和绿 -->
+    <color name="yes_button_normal">#FF4A7C59</color>
+    <color name="yes_button_selected">#FF3D6B4F</color>
+    <color name="yes_button_gaze">#FF6BA87A</color>
+
+    <!-- "否"按钮：深褐红 → 柔和红 -->
+    <color name="no_button_normal">#FF7C4A4A</color>
+    <color name="no_button_selected">#FF6B3D3D</color>
+    <color name="no_button_gaze">#FFA86B6B</color>
+
+    <!-- 背景颜色 -->
+    <color name="background_dark">#FF1E1E2E</color>
+    <color name="background_light">#FFFFFFFF</color>
+
+    <!-- 文本颜色 -->
+    <color name="text_primary">#FFF0F0F0</color>
+    <color name="text_secondary">#FFB0B0B0</color>
+    <color name="text_on_primary">#FFF0F0F0</color>
+
+    <!-- 状态颜色 -->
+    <color name="status_connected">#FF6BA87A</color>
+    <color name="status_disconnected">#FFA86B6B</color>
+    <color name="status_initializing">#FFD4A373</color>
+
+    <!-- 启动图标背景 -->
+    <color name="ic_launcher_background">#FF1E1E2E</color>
+</resources>

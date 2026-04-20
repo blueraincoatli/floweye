@@ -1,0 +1,42 @@
+# Android
+android_mvp/.gradle/
+android_mvp/build/
+android_mvp/app/build/
+android_mvp/local.properties
+android_mvp/.idea/
+android_mvp/*.iml
+android_mvp/app/*.iml
+*.apk
+*.aab
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+coordinator_app/*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Build
+*.class
+*.jar
+*.war
+
+# Misc
+*.log
+*.tmp
+*.bak
+android_mvp.zip
+PROJECT_SUMMARY.docx
+PROJECT_SUMMARY.pdf
+android_mvp/nul
