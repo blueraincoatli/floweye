@@ -46,11 +46,22 @@ class CameraManager(context: Context) {
     
     // 回调
     private var frameCallback: ((Bitmap) -> Unit)? = null
-    
+
+    // 调试预览 Surface（可选）
+    private var previewSurface: Surface? = null
+
     // 状态
     private var isInitialized = false
     private var isCapturing = false
-    
+
+    /**
+     * 设置调试预览 Surface。
+     * 在 createCaptureSession 时会同时输出到该 Surface。
+     */
+    fun setPreviewSurface(surface: Surface?) {
+        previewSurface = surface
+    }
+
     /**
      * 初始化摄像头管理器
      */
@@ -204,7 +215,8 @@ class CameraManager(context: Context) {
                 }, backgroundHandler)
             }
             
-            val surfaces = listOf(imageReader?.surface)
+            val surfaces = mutableListOf(imageReader?.surface)
+            previewSurface?.let { surfaces.add(it) }
             
             cameraDevice?.createCaptureSession(
                 surfaces,

@@ -5,6 +5,9 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
+import android.view.SurfaceView
+import android.view.View
+import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -12,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.gazeinteraction.camera.CameraManager
+import com.gazeinteraction.debug.FaceMeshOverlayView
 import com.gazeinteraction.gaze.GazeDetectionAlgorithm
 import com.gazeinteraction.mediapipe.FaceLandmarkerHelper
 import com.gazeinteraction.mqtt.MqttClient
@@ -54,6 +58,12 @@ class MainActivity : AppCompatActivity(),
     private lateinit var mediapipeStatus: TextView
     private lateinit var mqttStatus: TextView
     private lateinit var calibrateButton: FloatingActionButton
+
+    // ---------- 调试叠加层 ----------
+    private var debugPanel: FrameLayout? = null
+    private var debugSurfaceView: SurfaceView? = null
+    private var faceMeshOverlay: FaceMeshOverlayView? = null
+    private var isDebugMode = false
 
     // ---------- 核心组件 ----------
     private lateinit var cameraManager: CameraManager
@@ -124,6 +134,48 @@ class MainActivity : AppCompatActivity(),
         }
 
         deviceIdText.text = "设备ID: $deviceId"
+
+        // 调试叠加层（双击设备ID切换显示/隐藏）
+        debugPanel = findViewById(R.id.debugPanel)
+        debugSurfaceView = findViewById(R.id.debugSurfaceView)
+        faceMeshOverlay = findViewById(R.id.faceMeshOverlay)
+
+        deviceIdText.setOnClickListener(object : View.OnClickListener {
+            private var lastClickTime = 0L
+            override fun onClick(v: View) {
+                val now = System.currentTimeMillis()
+                if (now - lastClickTime < 500) {
+                    toggleDebugMode()
+                }
+                lastClickTime = now
+            }
+        })
+    }
+
+    private fun toggleDebugMode() {
+        isDebugMode = !isDebugMode
+        debugPanel?.visibility = if (isDebugMode) View.VISIBLE else View.GONE
+        if (isDebugMode) {
+            debugSurfaceView?.holder?.addCallback(object : android.view.SurfaceHolder.Callback {
+                override fun surfaceCreated(holder: android.view.SurfaceHolder) {
+                    if (::cameraManager.isInitialized) {
+                        cameraManager.setPreviewSurface(holder.surface)
+                    }
+                }
+                override fun surfaceChanged(holder: android.view.SurfaceHolder, fmt: Int, w: Int, h: Int) {}
+                override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
+                    if (::cameraManager.isInitialized) {
+                        cameraManager.setPreviewSurface(null)
+                    }
+                }
+            })
+        } else {
+            if (::cameraManager.isInitialized) {
+                cameraManager.setPreviewSurface(null)
+            }
+            faceMeshOverlay?.clear()
+        }
+        Toast.makeText(this, if (isDebugMode) "调试模式已开启" else "调试模式已关闭", Toast.LENGTH_SHORT).show()
     }
 
     private fun generateDeviceId() {
@@ -193,6 +245,26 @@ class MainActivity : AppCompatActivity(),
     }
 
     override fun onResults(resultBundle: FaceLandmarkerHelper.ResultBundle) {
+        // 调试叠加层：将关键点传递给 FaceMeshOverlayView
+        if (isDebugMode && faceMeshOverlay != null) {
+            try {
+                if (resultBundle.results.faceLandmarks().isNotEmpty()) {
+                    val landmarks = resultBundle.results.faceLandmarks()[0].landmarkList()
+                    runOnUiThread {
+                        faceMeshOverlay?.updateLandmarks(
+                            landmarks,
+                            resultBundle.inputImageWidth,
+                            resultBundle.inputImageHeight
+                        )
+                    }
+                } else {
+                    runOnUiThread { faceMeshOverlay?.clear() }
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "更新调试叠加层失败", e)
+            }
+        }
+
         when (calibrationState) {
             CalibrationState.CALIBRATING_YES,
             CalibrationState.CALIBRATING_NO -> {
@@ -482,6 +554,7 @@ class MainActivity : AppCompatActivity(),
         super.onDestroy()
         try {
             if (::cameraManager.isInitialized) {
+                cameraManager.setPreviewSurface(null)
                 cameraManager.release()
             }
             if (::faceLandmarkerHelper.isInitialized) {
@@ -490,6 +563,7 @@ class MainActivity : AppCompatActivity(),
             if (::mqttClient.isInitialized) {
                 mqttClient.disconnect()
             }
+            faceMeshOverlay?.clear()
         } catch (e: Exception) {
             Log.e(TAG, "清理资源失败", e)
         }
