@@ -12,7 +12,7 @@ import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
-import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerOptions
+import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker.FaceLandmarkerOptions
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 
 /**
@@ -124,7 +124,8 @@ class FaceLandmarkerHelper(
         try {
             // 创建MPImage
             val mpImage = BitmapImageBuilder(bitmap).build()
-            
+
+            Log.d(TAG, "detectAsync: bitmap=${bitmap.width}x${bitmap.height}, ts=$frameTimeMs")
             // 异步检测
             faceLandmarker?.detectAsync(mpImage, frameTimeMs)
             

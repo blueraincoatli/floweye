@@ -250,13 +250,13 @@ class CameraManager(context: Context) {
      */
     private fun startPreview() {
         try {
-            val requestBuilder = cameraDevice?.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-            requestBuilder?.addTarget(imageReader?.surface ?: return)
-            previewSurface?.let { requestBuilder?.addTarget(it) }
-            
+            val requestBuilder = cameraDevice?.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW) ?: return
+            requestBuilder.addTarget(imageReader?.surface ?: return)
+            previewSurface?.let { requestBuilder.addTarget(it) }
+
             // 针对华为设备的关键配置
             configureForHuaweiDevice(requestBuilder)
-            
+
             val captureRequest = requestBuilder.build()
             captureSession?.setRepeatingRequest(captureRequest, null, backgroundHandler)
             isCapturing = true
@@ -373,9 +373,7 @@ class CameraManager(context: Context) {
         // 使用 RenderScript 进行 YUV -> ARGB 转换
         if (renderScript == null) {
             renderScript = android.renderscript.RenderScript.create(appContext)
-            yuvToRgb = android.renderscript.ScriptIntrinsicYuvToRGB.Builder(renderScript)
-                .setElement(android.renderscript.Element.U8_4(renderScript))
-                .build()
+            yuvToRgb = android.renderscript.ScriptIntrinsicYuvToRGB.create(renderScript, android.renderscript.Element.U8_4(renderScript))
         }
 
         val yBuffer = image.planes[0].buffer
@@ -391,7 +389,7 @@ class CameraManager(context: Context) {
         vBuffer.get(nv21, ySize, vSize)
         uBuffer.get(nv21, ySize + vSize, uSize)
 
-        val allocation = android.renderscript.Allocation.createFromSized(
+        val allocation = android.renderscript.Allocation.createSized(
             renderScript,
             android.renderscript.Element.U8(renderScript),
             nv21.size
@@ -408,7 +406,29 @@ class CameraManager(context: Context) {
         allocation.destroy()
         bitmapAllocation.destroy()
 
-        return bitmap
+        // 前置摄像头需要旋转和镜像才能正确送给 MediaPipe
+        val rotated = rotateAndMirrorForFrontCamera(bitmap)
+        if (rotated !== bitmap) {
+            bitmap.recycle()
+        }
+
+        return rotated
+    }
+
+    /**
+     * 前置摄像头图像旋转 + 水平镜像
+     * sensorOrientation 通常为 270°，竖屏时需旋转 270° 再水平翻转
+     */
+    private fun rotateAndMirrorForFrontCamera(bitmap: Bitmap): Bitmap {
+        val matrix = Matrix()
+        // 旋转角度 = sensorOrientation（前置摄像头逆时针补偿）
+        matrix.postRotate(sensorOrientation.toFloat())
+        // 前置摄像头水平翻转（自拍镜像效果，确保 MediaPipe 检测正确）
+        matrix.postScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f)
+
+        val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        Log.d(TAG, "图像旋转: sensorOrientation=$sensorOrientation, 原始=${bitmap.width}x${bitmap.height}, 旋转后=${rotated.width}x${rotated.height}")
+        return rotated
     }
     
     /**
