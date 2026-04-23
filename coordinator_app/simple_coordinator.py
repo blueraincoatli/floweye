@@ -41,7 +41,7 @@ class SimpleCoordinator:
         self.broker_port = broker_port
         self.mqtt_client = None
         self.devices = {}  # 存储设备状态
-        self.lock = threading.Lock()  # 保护 self.devices
+        self.lock = threading.RLock()  # 保护 self.devices，允许决策发布时重入读取状态
 
         self.last_decision = "none"
         self.decision_confidence = 0.0

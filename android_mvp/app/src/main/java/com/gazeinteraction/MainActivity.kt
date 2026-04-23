@@ -44,6 +44,7 @@ class MainActivity : AppCompatActivity(),
         private const val TAG = "MainActivity"
         private const val PREFS_NAME = "gaze_prefs"
         private const val KEY_DEVICE_ROLE = "device_role"
+        private const val KEY_DEVICE_ID = "device_id"
         private const val MIN_CALIBRATION_SAMPLES = 10
     }
 
@@ -215,7 +216,15 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun generateDeviceId() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedId = prefs.getString(KEY_DEVICE_ID, null)
+        if (!savedId.isNullOrBlank()) {
+            deviceId = savedId
+            return
+        }
+
         deviceId = "GAZE_${UUID.randomUUID().toString().substring(0, 8).uppercase()}"
+        prefs.edit().putString(KEY_DEVICE_ID, deviceId).apply()
     }
 
     private fun checkAndRequestCameraPermission() {
@@ -397,7 +406,7 @@ class MainActivity : AppCompatActivity(),
 
     private fun publishState() {
         val now = System.currentTimeMillis()
-        if (!isLookingAtScreen != lastPublishedLooking) {
+        if (isLookingAtScreen != lastPublishedLooking) {
             // 状态变了，立即发布
         } else if (now - lastPublishTimeMs < PUBLISH_MIN_INTERVAL_MS) {
             return

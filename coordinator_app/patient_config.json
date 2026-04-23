@@ -1,0 +1,35 @@
+{
+  "patient_id": "default",
+  "name": "默认患者",
+  "max_menu_depth": 2,
+  "cognitive_level": "low",
+  "vision_ok": false,
+  "preferred_mode": "auto",
+  "single_device": {
+    "wake_gaze_seconds": 3.0,
+    "select_gaze_seconds": 1.5,
+    "emergency_gaze_seconds": 3.0,
+    "dwell_seconds": 5,
+    "max_dwell_seconds": 7,
+    "min_dwell_seconds": 3
+  },
+  "dual_device": {
+    "select_gaze_seconds": 1.5,
+    "emergency_triple_window_seconds": 5.0,
+    "dwell_seconds": 5,
+    "max_dwell_seconds": 7,
+    "min_dwell_seconds": 3
+  },
+  "tts": {
+    "rate": 120,
+    "volume": 0.8,
+    "night_volume": 0.4,
+    "night_start_hour": 22,
+    "night_end_hour": 6
+  },
+  "adaptive": {
+    "enabled": true,
+    "history_window_size": 5,
+    "dwell_adjust_step": 0.5
+  }
+}
