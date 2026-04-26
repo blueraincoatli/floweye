@@ -2,13 +2,122 @@ import unittest
 from pathlib import Path
 import sys
 import types
+import json
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.modules.setdefault("paho", types.ModuleType("paho"))
 sys.modules.setdefault("paho.mqtt", types.ModuleType("paho.mqtt"))
 sys.modules.setdefault("paho.mqtt.client", types.ModuleType("paho.mqtt.client"))
 
-from scanning_coordinator import ConfigLoader, GazeInterpreter, InteractionMode, State
+from scanning_coordinator import ConfigLoader, GazeInterpreter, InteractionMode, ScanningCoordinator, State
+
+
+class FakeTTS:
+    def __init__(self):
+        self.spoken = []
+
+    def speak(self, text):
+        self.spoken.append(text)
+
+    def stop(self):
+        pass
+
+
+class CoordinatorStateMachineTest(unittest.TestCase):
+    def setUp(self):
+        self.coordinator = ScanningCoordinator(
+            broker_host="localhost",
+            broker_port=1883,
+            menu_path="",
+            patient_path="",
+        )
+        self.coordinator.tts = FakeTTS()
+        self.published = []
+        self.coordinator.publish_decision = lambda decision_type, option, urgency="normal": self.published.append(
+            {
+                "type": decision_type,
+                "option": option.get("id") if option else None,
+                "urgency": urgency,
+            }
+        )
+
+    def test_wake_enters_scan_and_speaks_first_option(self):
+        self.coordinator._handle_action("wake", None)
+
+        self.assertEqual(self.coordinator.state, State.SCAN)
+        self.assertEqual(self.coordinator.menu_engine.get_current_option()["id"], "uncomfortable")
+        self.assertIn("您不舒服吗？", self.coordinator.tts.spoken[-1])
+
+    def test_select_submenu_keeps_scan_and_speaks_first_child(self):
+        self.coordinator._enter_scan()
+        self.coordinator._handle_action("select", self.coordinator.menu_engine.get_current_option())
+
+        self.assertEqual(self.coordinator.state, State.SCAN)
+        self.assertFalse(self.coordinator.menu_engine.is_at_root)
+        self.assertEqual(self.coordinator.menu_engine.get_current_option()["id"], "headache")
+        self.assertIn("您头疼吗？", self.coordinator.tts.spoken[-1])
+
+    def test_leaf_selection_enters_confirm_and_confirm_executes(self):
+        self.coordinator._enter_scan()
+        self.coordinator._handle_action("select", self.coordinator.menu_engine.get_current_option())
+        self.coordinator._handle_action("select", self.coordinator.menu_engine.get_current_option())
+
+        self.assertEqual(self.coordinator.state, State.CONFIRM)
+        self.assertEqual(self.coordinator._confirm_option["id"], "headache")
+        self.assertIn("确认您头疼吗？", self.coordinator.tts.spoken[-1])
+
+        self.coordinator._handle_action("confirm", None)
+
+        self.assertEqual(self.coordinator.state, State.WAITING)
+        self.assertEqual(self.published[-1]["type"], "selection")
+        self.assertEqual(self.published[-1]["option"], "headache")
+        self.assertIn("已通知", self.coordinator.tts.spoken[-1])
+
+    def test_cancel_returns_to_scan(self):
+        self.coordinator._enter_scan()
+        self.coordinator._handle_action("select", self.coordinator.menu_engine.get_current_option())
+        self.coordinator._handle_action("select", self.coordinator.menu_engine.get_current_option())
+
+        self.coordinator._handle_action("cancel", None)
+
+        self.assertEqual(self.coordinator.state, State.SCAN)
+        self.assertIsNone(self.coordinator._confirm_option)
+        self.assertEqual(self.coordinator.menu_engine.get_current_option()["id"], "headache")
+        self.assertIn("您头疼吗？", self.coordinator.tts.spoken[-1])
+
+    def test_skip_confirm_option_executes_without_confirm(self):
+        self.coordinator._enter_scan()
+        self.coordinator.menu_engine._current_index = 2
+        self.coordinator._handle_action("select", self.coordinator.menu_engine.get_current_option())
+
+        self.assertEqual(self.coordinator.state, State.SCAN)
+        self.assertEqual(self.coordinator.menu_engine.get_current_option()["id"], "confirm_emergency")
+
+        self.coordinator._handle_action("select", self.coordinator.menu_engine.get_current_option())
+
+        self.assertEqual(self.coordinator.state, State.WAITING)
+        self.assertEqual(self.published[-1]["type"], "selection")
+        self.assertEqual(self.published[-1]["option"], "confirm_emergency")
+        self.assertEqual(self.published[-1]["urgency"], "critical")
+
+    def test_on_message_routes_four_part_topics(self):
+        handled = []
+        self.coordinator._handle_gaze_status = lambda payload: handled.append(("gaze", payload["deviceId"]))
+        self.coordinator._handle_device_status = lambda payload: handled.append(("status", payload["deviceId"]))
+
+        gaze_msg = types.SimpleNamespace(
+            topic="gazecontrol/device/test-device/gaze_status",
+            payload=json.dumps({"deviceId": "test-device"}).encode("utf-8"),
+        )
+        status_msg = types.SimpleNamespace(
+            topic="gazecontrol/device/test-device/status",
+            payload=json.dumps({"deviceId": "test-device", "status": "online"}).encode("utf-8"),
+        )
+
+        self.coordinator._on_message(None, None, gaze_msg)
+        self.coordinator._on_message(None, None, status_msg)
+
+        self.assertEqual(handled, [("gaze", "test-device"), ("status", "test-device")])
 
 
 class GazeInterpreterTest(unittest.TestCase):

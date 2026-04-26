@@ -1,86 +1,133 @@
-# 多设备协同视线交互系统 - 中央协调器
+# FlowEye Coordinator App
 
-## 功能概述
-中央协调器应用负责：
-1. 接收多个移动设备的视线检测状态
-2. 综合分析用户的选择意图
-3. 显示实时的交互状态
-4. 做出最终的"是/否"决策
+本目录包含 FlowEye 的 Python 协调器实现、联调脚本和测试。
 
-## 技术实现
-- **框架**: Flutter（跨平台支持）
-- **通信**: MQTT协议
-- **支持平台**: Windows, macOS, Linux
+## 当前状态
 
-## 系统架构
+当前主线协调器是 `scanning_coordinator.py`，已经完成本地 MQTT 联调并验证以下场景：
 
+- `single_select`
+- `dual_confirm`
+- `dual_skip`
+- `dual_emergency`
+
+保留的 `simple_coordinator.py` 主要用于：
+
+- 最小 MQTT 决策基线
+- smoke test
+- 排障和回退对比
+
+当前更完整的整体状态请看：
+
+- [project_status.md](D:\floweye3\docs\project_status.md)
+- [coordinator_implementation_plan.md](D:\floweye3\docs\coordinator_implementation_plan.md)
+
+## 目录说明
+
+- `simple_coordinator.py`: 最小 MQTT 决策协调器
+- `scanning_coordinator.py`: 当前主线扫描协调器
+- `simulate_scanning_flow.py`: 本地 MQTT 场景模拟脚本
+- `menu_config.json`: 菜单树和播报文案
+- `patient_config.json`: 患者参数和时序配置
+- `test_coordinator.py`: 简单 broker 观察脚本
+- `test_scanning_coordinator.py`: 协调器自动化测试
+
+## 运行方式
+
+### `simple_coordinator.py`
+
+用于最小链路验证：
+
+```bash
+python coordinator_app/simple_coordinator.py <broker_ip> 1883
 ```
-移动设备A (是) ──┐
-移动设备B (否) ──┼─→ MQTT Broker ──→ 中央协调器 ──→ 最终决策
-移动设备C (是) ──┘
+
+### `scanning_coordinator.py`
+
+用于实际扫描交互原型：
+
+```bash
+python coordinator_app/scanning_coordinator.py --host <broker_ip> --port 1883 --menu coordinator_app/menu_config.json --patient coordinator_app/patient_config.json
 ```
 
-## 主要功能
+当前已实现能力：
 
-### 1. 设备管理
-- 自动发现连接的移动设备
-- 显示设备在线/离线状态
-- 管理设备的角色分配（是/否/其他）
+- 单设备唤醒和扫描
+- 双设备 yes/no 交互
+- 子菜单导航
+- confirm / cancel / skip
+- triple-yes emergency
+- 自适应 dwell
+- 异步 TTS 队列
 
-### 2. 实时状态显示
-- 可视化每个设备的视线检测状态
-- 实时置信度显示
-- 用户注视状态的动态更新
+## MQTT Topics
 
-### 3. 决策逻辑
-- 基于多设备输入的综合决策
-- 冲突处理（如同时看向多个设备）
-- 超时处理和重置机制
+订阅：
 
-### 4. 用户界面
-- 清晰的设备状态展示
-- 实时的用户选择反馈
-- 系统配置和设置选项
+- `gazecontrol/device/+/gaze_status`
+- `gazecontrol/device/+/status`
 
-## 运行要求
-- Flutter SDK 3.0+
-- MQTT Broker（如Mosquitto）
-- 局域网连接
+发布：
 
-## 快速开始
+- `gazecontrol/coordination/decision`
 
-### 1. 安装依赖
+## Gaze Payload 约定
+
+`scanning_coordinator.py` 当前依赖的主要字段：
+
+- `deviceId`
+- `role`
+- `lookingAtScreen`
+- `confidence`
+- `calibrated`
+
+## 开发与测试
+
+安装依赖：
+
 ```bash
 cd coordinator_app
-flutter pub get
+pip install -r requirements.txt
 ```
 
-### 2. 配置MQTT
-编辑 `lib/config/mqtt_config.dart` 设置MQTT Broker地址
+运行测试：
 
-### 3. 运行应用
 ```bash
-flutter run -d windows  # Windows
-flutter run -d macos    # macOS  
-flutter run -d linux    # Linux
+python -m pytest coordinator_app/test_scanning_coordinator.py
+python coordinator_app/test_coordinator.py
 ```
 
-## 配置说明
+当前自动化测试状态：
 
-### MQTT设置
-- **Broker地址**: 默认 192.168.1.100:1883
-- **主题前缀**: gazecontrol
-- **QoS级别**: 1
+- `test_scanning_coordinator.py`
+- 结果：`8 passed`
 
-### 设备配置
-- 自动检测设备类型和功能
-- 支持2-5个移动设备同时连接
-- 设备角色自动分配或手动设置
+## 本地 MQTT 联调
 
-## 开发计划
-- [x] 基础架构设计
-- [ ] Flutter项目创建
-- [ ] MQTT客户端集成
-- [ ] UI界面开发
-- [ ] 决策算法实现
-- [ ] 测试和优化
+先启动扫描协调器：
+
+```bash
+python coordinator_app/scanning_coordinator.py --host localhost --port 1883 --menu coordinator_app/menu_config.json --patient coordinator_app/patient_config.json
+```
+
+再在第二个终端运行场景模拟：
+
+```bash
+python coordinator_app/simulate_scanning_flow.py --host localhost --port 1883 --scenario single_select
+python coordinator_app/simulate_scanning_flow.py --host localhost --port 1883 --scenario dual_confirm
+python coordinator_app/simulate_scanning_flow.py --host localhost --port 1883 --scenario dual_skip
+python coordinator_app/simulate_scanning_flow.py --host localhost --port 1883 --scenario dual_emergency
+```
+
+预期结果：
+
+- `single_select`: 发布 `selection`
+- `dual_confirm`: 发布 `selection`
+- `dual_skip`: 至少触发 `skip`，并可继续完成最终 `selection`
+- `dual_emergency`: 发布 `emergency`
+
+## 日志说明
+
+联调阶段会在本目录生成临时 `.log` 文件用于检查标准输出/错误输出，这些文件不作为项目文档，也不应作为开发状态来源。
+
+如果需要查看中文日志，请优先按 UTF-8 读取。

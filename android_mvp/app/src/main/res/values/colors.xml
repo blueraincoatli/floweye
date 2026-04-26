@@ -17,16 +17,18 @@
     <!--
         按钮颜色 - 低饱和度柔和配色
         原则：降低饱和度、避免纯黑纯白，减少视觉疲劳
+        区分策略：不注视时偏灰（中性低饱和），注视时呈现明确的低饱和彩色，
+                 以色相差异为主，避免亮度/对比度过高导致刺眼
     -->
-    <!-- "是"按钮：深苔绿 → 柔和绿 -->
-    <color name="yes_button_normal">#FF4A7C59</color>
+    <!-- "是"按钮：灰青绿（不注视） → 柔和绿（注视） -->
+    <color name="yes_button_normal">#FF4A5C52</color>
     <color name="yes_button_selected">#FF3D6B4F</color>
-    <color name="yes_button_gaze">#FF6BA87A</color>
+    <color name="yes_button_gaze">#FF7DB88A</color>
 
-    <!-- "否"按钮：深褐红 → 柔和红 -->
-    <color name="no_button_normal">#FF7C4A4A</color>
+    <!-- "否"按钮：灰褐（不注视） → 柔和玫瑰红（注视） -->
+    <color name="no_button_normal">#FF5C4A48</color>
     <color name="no_button_selected">#FF6B3D3D</color>
-    <color name="no_button_gaze">#FFA86B6B</color>
+    <color name="no_button_gaze">#FFB88A8A</color>
 
     <!-- 背景颜色 -->
     <color name="background_dark">#FF1E1E2E</color>

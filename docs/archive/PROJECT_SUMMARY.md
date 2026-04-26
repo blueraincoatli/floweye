@@ -1,5 +1,7 @@
 # 失能患者视线检测交互应用 - 项目总结
 
+> 历史归档说明（2026-04-26）：本文是 2025-06-23 的阶段性总结，不代表仓库当前实现状态。当前状态请查看 `docs/project_status.md`、根目录 `README.md` 和 `docs/coordinator_implementation_plan.md`。
+
 **作者**: MiniMax Agent  
 **完成时间**: 2025-06-23  
 **项目状态**: MVP开发完成，可供测试部署

@@ -103,10 +103,10 @@ class SimpleCoordinator:
             parts = topic.split("/")
 
             # 精确匹配: gazecontrol/device/{deviceId}/gaze_status
-            if len(parts) == 5 and parts[0] == "gazecontrol" and parts[1] == "device" and parts[3] == "gaze_status":
+            if len(parts) == 4 and parts[0] == "gazecontrol" and parts[1] == "device" and parts[3] == "gaze_status":
                 self.handle_gaze_status(payload)
             # 精确匹配: gazecontrol/device/{deviceId}/status
-            elif len(parts) == 5 and parts[0] == "gazecontrol" and parts[1] == "device" and parts[3] == "status":
+            elif len(parts) == 4 and parts[0] == "gazecontrol" and parts[1] == "device" and parts[3] == "status":
                 self.handle_device_status(payload)
         except Exception as e:
             logger.error("处理消息异常 (topic=%s): %s", msg.topic, e)

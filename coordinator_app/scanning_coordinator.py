@@ -7,6 +7,8 @@ import argparse
 import json
 import logging
 import os
+import queue
+import sys
 import threading
 import time
 from collections import deque
@@ -15,6 +17,20 @@ from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Tuple
 
 import paho.mqtt.client as mqtt
+
+
+def _configure_stdio() -> None:
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_configure_stdio()
 
 try:
     import pyttsx3
@@ -236,6 +252,8 @@ class TTSEngine:
         self._config = config_loader
         self._engine: Any = None
         self._lock = threading.Lock()
+        self._queue: "queue.Queue[Optional[str]]" = queue.Queue()
+        self._stopped = threading.Event()
         if _PYTTSX3_AVAILABLE and pyttsx3 is not None:
             try:
                 self._engine = pyttsx3.init()
@@ -246,6 +264,8 @@ class TTSEngine:
                 self._engine = None
         else:
             logger.warning("pyttsx3 not installed, TTS unavailable")
+        self._worker = threading.Thread(target=self._run, name="tts-worker", daemon=True)
+        self._worker.start()
 
     @staticmethod
     def _is_night_mode() -> bool:
@@ -259,24 +279,40 @@ class TTSEngine:
 
     def speak(self, text: str) -> None:
         logger.info("[TTS] %s", text)
-        if self._engine is None:
+        if self._stopped.is_set() or self._engine is None:
             return
-        with self._lock:
+        self._queue.put(text)
+
+    def _run(self) -> None:
+        while not self._stopped.is_set():
             try:
-                self._engine.setProperty("volume", self._get_volume())
-                self._engine.say(text)
-                self._engine.runAndWait()
-            except Exception as e:
-                logger.warning("TTS speak failed: %s", e)
+                text = self._queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+
+            if text is None:
+                self._queue.task_done()
+                break
+
+            with self._lock:
+                try:
+                    self._engine.setProperty("volume", self._get_volume())
+                    self._engine.say(text)
+                    self._engine.runAndWait()
+                except Exception as e:
+                    logger.warning("TTS speak failed: %s", e)
+            self._queue.task_done()
 
     def stop(self) -> None:
-        if self._engine is None:
-            return
-        with self._lock:
-            try:
-                self._engine.stop()
-            except Exception as e:
-                logger.warning("TTS stop failed: %s", e)
+        self._stopped.set()
+        if self._engine is not None:
+            with self._lock:
+                try:
+                    self._engine.stop()
+                except Exception as e:
+                    logger.warning("TTS stop failed: %s", e)
+        self._queue.put(None)
+        self._worker.join(timeout=1.0)
 
 
 class GazeInterpreter:
@@ -547,9 +583,9 @@ class ScanningCoordinator:
             return
         try:
             parts = msg.topic.split("/")
-            if len(parts) == 5 and parts[0] == "gazecontrol" and parts[1] == "device" and parts[3] == "gaze_status":
+            if len(parts) == 4 and parts[0] == "gazecontrol" and parts[1] == "device" and parts[3] == "gaze_status":
                 self._handle_gaze_status(payload)
-            elif len(parts) == 5 and parts[0] == "gazecontrol" and parts[1] == "device" and parts[3] == "status":
+            elif len(parts) == 4 and parts[0] == "gazecontrol" and parts[1] == "device" and parts[3] == "status":
                 self._handle_device_status(payload)
         except Exception as e:
             logger.error("Message handler error (topic=%s): %s", msg.topic, e)
