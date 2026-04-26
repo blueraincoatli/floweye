@@ -121,15 +121,15 @@ class SimpleCoordinator:
     def handle_gaze_status(self, data):
         """处理视线状态消息"""
         device_id = data.get("deviceId", "unknown")
-        gaze_target = data.get("gazeTarget", "none")
+        gaze_target = data.get("role", "none")
         confidence = data.get("confidence", 0.0)
-        is_looking = data.get("isLookingAtThisDevice", False)
+        is_looking = data.get("lookingAtScreen", False)
 
         with self.lock:
             self.devices[device_id] = {
-                "gazeTarget": gaze_target,
+                "role": gaze_target,
                 "confidence": confidence,
-                "isLookingAtThisDevice": is_looking,
+                "lookingAtScreen": is_looking,
                 "lastUpdate": time.time(),
                 "displayedContent": data.get("displayedContent", {})
             }
@@ -171,11 +171,11 @@ class SimpleCoordinator:
             best_confidence = 0.0
 
             for device_id, data in valid_devices.items():
-                if (data.get("isLookingAtThisDevice", False) and
-                    data.get("gazeTarget") in ["yes", "no"] and
+                if (data.get("lookingAtScreen", False) and
+                    data.get("role") in ["yes", "no"] and
                     data.get("confidence", 0) >= self.MIN_CONFIDENCE):
 
-                    target = data.get("gazeTarget")
+                    target = data.get("role")
                     conf = data.get("confidence", 0)
                     total, count = gaze_votes.get(target, (0.0, 0))
                     gaze_votes[target] = (total + conf, count + 1)
@@ -264,7 +264,7 @@ class SimpleCoordinator:
 
                 lines.append("  %s %s... -> %s (置信度: %.2f)" % (
                     status, device_id[:12],
-                    data.get('gazeTarget', 'none'),
+                    data.get('role', 'none'),
                     data.get('confidence', 0)
                 ))
 

@@ -200,7 +200,8 @@ class GazeDetectionAlgorithm(private val context: Context) {
         if (looking) {
             if (lastLookingAtScreen) {
                 consecutiveFrames++
-                if (consecutiveFrames >= requiredConsecutiveFrames) {
+                // 只在首次达到连续阈值时触发一次，避免每帧重复回调
+                if (consecutiveFrames == requiredConsecutiveFrames) {
                     gazeListener?.onGazeAtScreen(confidence)
                 }
             } else {
