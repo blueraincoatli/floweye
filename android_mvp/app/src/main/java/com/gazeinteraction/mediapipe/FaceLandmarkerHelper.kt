@@ -64,14 +64,10 @@ class FaceLandmarkerHelper(
         val inputImageRotation: Int = 0
     )
     
-    init {
-        initializeFaceLandmarker()
-    }
-    
     /**
      * 初始化Face Landmarker
      */
-    private fun initializeFaceLandmarker() {
+    fun initialize() {
         try {
             // 创建BaseOptions - 华为设备专用配置
             val baseOptions = BaseOptions.builder()
@@ -200,7 +196,7 @@ class FaceLandmarkerHelper(
      */
     fun reinitialize() {
         clearFaceLandmarker()
-        initializeFaceLandmarker()
+        initialize()
     }
     
     /**

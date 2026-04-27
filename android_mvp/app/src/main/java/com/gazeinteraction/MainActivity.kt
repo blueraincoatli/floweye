@@ -23,8 +23,10 @@ import com.gazeinteraction.gaze.GazeDetectionAlgorithm
 import com.gazeinteraction.mediapipe.FaceLandmarkerHelper
 import com.gazeinteraction.mqtt.MqttClient
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.*
 
 /**
@@ -243,9 +245,10 @@ class MainActivity : AppCompatActivity(),
     private fun initializeComponents() {
         lifecycleScope.launch {
             try {
-                // 1. MediaPipe
+                // 1. MediaPipe (在IO线程加载模型，避免阻塞主线程)
                 updateStatus(mediapipeStatus, "初始化中...", Color.YELLOW)
                 faceLandmarkerHelper = FaceLandmarkerHelper(this@MainActivity, this@MainActivity)
+                withContext(Dispatchers.IO) { faceLandmarkerHelper.initialize() }
                 updateStatus(mediapipeStatus, "就绪", Color.GREEN)
 
                 // 2. 视线算法
@@ -258,6 +261,7 @@ class MainActivity : AppCompatActivity(),
                 cameraManager.initialize { bitmap ->
                     faceLandmarkerHelper.detectLiveStream(bitmap, System.currentTimeMillis())
                 }
+                cameraManager.startCamera()
                 updateStatus(cameraStatus, "就绪", Color.GREEN)
 
                 // 4. MQTT

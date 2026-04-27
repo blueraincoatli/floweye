@@ -29,7 +29,7 @@ class MqttClient(
         private const val PREF_KEY_BROKER_PORT = "broker_port"
 
         // 默认值（仅作为首次使用时的回退）
-        private const val DEFAULT_BROKER_HOST = "192.168.1.100"
+        private const val DEFAULT_BROKER_HOST = "127.0.0.1"
         private const val DEFAULT_BROKER_PORT = 1883
         private const val QOS = 1
         private const val KEEP_ALIVE_INTERVAL = 60
