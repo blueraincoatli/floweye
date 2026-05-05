@@ -1,11 +1,8 @@
 package com.gazeinteraction.mqtt
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import com.google.gson.Gson
-import org.eclipse.paho.android.service.MqttAndroidClient
 import org.eclipse.paho.client.mqttv3.*
 
 /**
@@ -43,10 +40,8 @@ class MqttClient(
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val mainHandler = Handler(Looper.getMainLooper())
-    
     // MQTT组件
-    private var mqttAndroidClient: MqttAndroidClient? = null
+    private var pahoClient: org.eclipse.paho.client.mqttv3.MqttClient? = null
     private val gson = Gson()
     
     // 连接参数
@@ -73,91 +68,68 @@ class MqttClient(
     fun connect(host: String? = null, port: Int? = null) {
         brokerHost = host ?: prefs.getString(PREF_KEY_BROKER_HOST, DEFAULT_BROKER_HOST) ?: DEFAULT_BROKER_HOST
         brokerPort = port ?: prefs.getInt(PREF_KEY_BROKER_PORT, DEFAULT_BROKER_PORT)
-        
-        try {
-            val serverUri = "tcp://$brokerHost:$brokerPort"
-            val clientId = "GazeApp_$deviceId"
-            
-            Log.i(TAG, "连接MQTT Broker: $serverUri, ClientId: $clientId")
-            
-            mqttAndroidClient = MqttAndroidClient(context, serverUri, clientId)
-            
-            // 设置回调
-            mqttAndroidClient?.setCallback(object : MqttCallbackExtended {
-                override fun connectComplete(reconnect: Boolean, serverURI: String) {
-                    isConnected = true
-                    Log.i(TAG, "MQTT连接成功: $serverURI (重连: $reconnect)")
-                    
-                    mainHandler.post {
-                        connectionListener?.onConnected()
+
+        Thread {
+            try {
+                val serverUri = "tcp://$brokerHost:$brokerPort"
+                val clientId = "GazeApp_$deviceId"
+                Log.i(TAG, "连接MQTT Broker: $serverUri, ClientId: $clientId")
+
+                pahoClient = org.eclipse.paho.client.mqttv3.MqttClient(serverUri, clientId)
+
+                val options = MqttConnectOptions().apply {
+                    isAutomaticReconnect = true
+                    isCleanSession = true
+                    keepAliveInterval = KEEP_ALIVE_INTERVAL
+                    connectionTimeout = CONNECTION_TIMEOUT
+                    val willTopic = String.format(DEVICE_STATUS_TOPIC, deviceId)
+                    val willMessage = gson.toJson(mapOf(
+                        "deviceId" to deviceId,
+                        "status" to "offline",
+                        "timestamp" to System.currentTimeMillis()
+                    ))
+                    setWill(willTopic, willMessage.toByteArray(), QOS, true)
+                }
+
+                pahoClient?.connect(options)
+                isConnected = true
+                Log.i(TAG, "MQTT连接成功: $serverUri")
+
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    connectionListener?.onConnected()
+                }
+
+                pahoClient?.setCallback(object : MqttCallback {
+                    override fun connectionLost(cause: Throwable?) {
+                        isConnected = false
+                        Log.w(TAG, "MQTT连接丢失", cause)
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            connectionListener?.onDisconnected()
+                        }
                     }
-                    
-                    // 发布设备在线状态
-                    publishDeviceStatus("online")
-                    
-                    // 订阅协调话题（如需要）
-                    subscribeToCoordinationTopic()
-                }
-                
-                override fun connectionLost(cause: Throwable?) {
-                    isConnected = false
-                    Log.w(TAG, "MQTT连接丢失", cause)
-                    
-                    mainHandler.post {
-                        connectionListener?.onDisconnected()
+
+                    override fun messageArrived(topic: String, message: MqttMessage) {
+                        val payload = String(message.payload)
+                        Log.d(TAG, "收到MQTT消息: $topic -> $payload")
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            connectionListener?.onMessageReceived(topic, payload)
+                        }
                     }
+
+                    override fun deliveryComplete(token: IMqttDeliveryToken) {}
+                })
+
+                publishDeviceStatus("online")
+                subscribeToCoordinationTopic()
+
+            } catch (e: Exception) {
+                Log.e(TAG, "MQTT连接失败", e)
+                isConnected = false
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    connectionListener?.onConnectionFailed(e.message ?: "连接失败")
                 }
-                
-                override fun messageArrived(topic: String, message: MqttMessage) {
-                    val messageContent = String(message.payload)
-                    Log.d(TAG, "收到MQTT消息: $topic -> $messageContent")
-                    
-                    mainHandler.post {
-                        connectionListener?.onMessageReceived(topic, messageContent)
-                    }
-                }
-                
-                override fun deliveryComplete(token: IMqttDeliveryToken) {
-                    // 消息发送完成
-                }
-            })
-            
-            // 连接选项
-            val options = MqttConnectOptions().apply {
-                isAutomaticReconnect = true
-                isCleanSession = true
-                keepAliveInterval = KEEP_ALIVE_INTERVAL
-                connectionTimeout = CONNECTION_TIMEOUT
-                
-                // 设置遗嘱消息（设备离线时自动发布）
-                val willTopic = String.format(DEVICE_STATUS_TOPIC, deviceId)
-                val willMessage = gson.toJson(mapOf(
-                    "deviceId" to deviceId,
-                    "status" to "offline",
-                    "timestamp" to System.currentTimeMillis()
-                ))
-                setWill(willTopic, willMessage.toByteArray(), QOS, true)
             }
-            
-            // 执行连接
-            mqttAndroidClient?.connect(options, null, object : IMqttActionListener {
-                override fun onSuccess(asyncActionToken: IMqttToken) {
-                    Log.i(TAG, "MQTT连接请求发送成功")
-                }
-                
-                override fun onFailure(asyncActionToken: IMqttToken, exception: Throwable) {
-                    Log.e(TAG, "MQTT连接失败", exception)
-                    
-                    mainHandler.post {
-                        connectionListener?.onConnectionFailed(exception.message ?: "连接失败")
-                    }
-                }
-            })
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "创建MQTT客户端失败", e)
-            connectionListener?.onConnectionFailed(e.message ?: "创建客户端失败")
-        }
+        }.start()
     }
     
     /**
@@ -168,23 +140,13 @@ class MqttClient(
             Log.w(TAG, "MQTT未连接，无法发布视线状态")
             return
         }
-        
         try {
             val topic = String.format(GAZE_STATUS_TOPIC, deviceId)
             val message = gson.toJson(gazeData)
-            
-            mqttAndroidClient?.publish(topic, message.toByteArray(), QOS, false, null, object : IMqttActionListener {
-                override fun onSuccess(asyncActionToken: IMqttToken) {
-                    Log.d(TAG, "视线状态发布成功: $topic")
-                }
-                
-                override fun onFailure(asyncActionToken: IMqttToken, exception: Throwable) {
-                    Log.e(TAG, "视线状态发布失败", exception)
-                }
-            })
-            
+            pahoClient?.publish(topic, message.toByteArray(), QOS, false)
+            Log.d(TAG, "视线状态发布成功: $topic")
         } catch (e: Exception) {
-            Log.e(TAG, "发布视线状态异常", e)
+            Log.e(TAG, "视线状态发布失败", e)
         }
     }
     
@@ -201,17 +163,8 @@ class MqttClient(
                 "capabilities" to listOf("gaze_detection", "yes_no_interaction")
             )
             val message = gson.toJson(statusData)
-            
-            mqttAndroidClient?.publish(topic, message.toByteArray(), QOS, true, null, object : IMqttActionListener {
-                override fun onSuccess(asyncActionToken: IMqttToken) {
-                    Log.d(TAG, "设备状态发布成功: $status")
-                }
-                
-                override fun onFailure(asyncActionToken: IMqttToken, exception: Throwable) {
-                    Log.e(TAG, "设备状态发布失败", exception)
-                }
-            })
-            
+            pahoClient?.publish(topic, message.toByteArray(), QOS, true)
+            Log.d(TAG, "设备状态发布成功: $status")
         } catch (e: Exception) {
             Log.e(TAG, "发布设备状态异常", e)
         }
@@ -222,18 +175,10 @@ class MqttClient(
      */
     private fun subscribeToCoordinationTopic() {
         try {
-            mqttAndroidClient?.subscribe(COORDINATION_TOPIC, QOS, null, object : IMqttActionListener {
-                override fun onSuccess(asyncActionToken: IMqttToken) {
-                    Log.i(TAG, "成功订阅协调话题: $COORDINATION_TOPIC")
-                }
-                
-                override fun onFailure(asyncActionToken: IMqttToken, exception: Throwable) {
-                    Log.e(TAG, "订阅协调话题失败", exception)
-                }
-            })
-            
+            pahoClient?.subscribe(COORDINATION_TOPIC, QOS)
+            Log.i(TAG, "成功订阅协调话题: $COORDINATION_TOPIC")
         } catch (e: Exception) {
-            Log.e(TAG, "订阅协调话题异常", e)
+            Log.e(TAG, "订阅协调话题失败", e)
         }
     }
     
@@ -243,19 +188,10 @@ class MqttClient(
     fun disconnect() {
         try {
             if (isConnected) {
-                // 发布离线状态
                 publishDeviceStatus("offline")
-                
-                mqttAndroidClient?.disconnect(null, object : IMqttActionListener {
-                    override fun onSuccess(asyncActionToken: IMqttToken) {
-                        Log.i(TAG, "MQTT断开连接成功")
-                        isConnected = false
-                    }
-                    
-                    override fun onFailure(asyncActionToken: IMqttToken, exception: Throwable) {
-                        Log.e(TAG, "MQTT断开连接失败", exception)
-                    }
-                })
+                isConnected = false
+                pahoClient?.disconnect()
+                pahoClient?.close()
             }
         } catch (e: Exception) {
             Log.e(TAG, "断开MQTT连接异常", e)
