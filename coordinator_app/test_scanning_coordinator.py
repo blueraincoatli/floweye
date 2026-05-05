@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import types
 import json
+import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.modules.setdefault("paho", types.ModuleType("paho"))
@@ -126,6 +127,24 @@ class CoordinatorStateMachineTest(unittest.TestCase):
         self.coordinator.mqtt_client.is_connected.return_value = True
         self.coordinator._reset_to_idle()
         self.assertTrue(self.coordinator.mqtt_client.publish.called)
+
+
+    def test_hesitation_resets_dwell(self):
+        self.coordinator.state = State.SCAN
+        old_dwell = self.coordinator._dwell_start
+        self.coordinator.gaze._device_gaze_start["test_device"] = time.time() - 0.5
+        action, param = self.coordinator.gaze.process_gaze_event(
+            device_id="test_device",
+            role="yes",
+            is_looking=True,
+            confidence=0.9,
+            mode=InteractionMode.DUAL_SWITCH,
+            current_state=self.coordinator.state,
+            current_option=None,
+        )
+        self.assertEqual(action, "hesitate")
+        self.coordinator._handle_action(action, param)
+        self.assertGreater(self.coordinator._dwell_start, old_dwell)
 
 
 class GazeInterpreterTest(unittest.TestCase):

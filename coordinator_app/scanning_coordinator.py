@@ -338,6 +338,7 @@ class GazeInterpreter:
         self._config = config_loader
         self._device_gaze_start: Dict[str, float] = {}
         self._device_action_latched: Dict[str, bool] = {}
+        self._device_hesitate_latched: Dict[str, bool] = {}
         self._yes_history: deque = deque(maxlen=10)
         self._lock = threading.Lock()
 
@@ -346,6 +347,7 @@ class GazeInterpreter:
         if not is_looking:
             self._device_gaze_start.pop(device_id, None)
             self._device_action_latched.pop(device_id, None)
+            self._device_hesitate_latched.pop(device_id, None)
             return 0.0
         start = self._device_gaze_start.setdefault(device_id, now)
         return now - start
@@ -397,6 +399,8 @@ class GazeInterpreter:
 
             elif mode == InteractionMode.DUAL_SWITCH:
                 select_sec = self._config.get_param("dual_device.select_gaze_seconds", 1.5)
+                skip_sec = self._config.get_param("dual_device.skip_gaze_seconds", 0.5)
+                hesitation_sec = self._config.get_param("dual_device.hesitation_seconds", 0.3)
                 triple_window = self._config.get_param("dual_device.emergency_triple_window_seconds", 5.0)
 
                 if role == "yes" and duration >= select_sec:
@@ -412,7 +416,12 @@ class GazeInterpreter:
                     if current_state == State.CONFIRM:
                         return self._emit_once(device_id, "confirm")
 
-                if role == "no" and duration >= select_sec:
+                if role == "yes" and current_state == State.SCAN and hesitation_sec <= duration < select_sec:
+                    if not self._device_hesitate_latched.get(device_id, False):
+                        self._device_hesitate_latched[device_id] = True
+                        return self._emit_once(device_id, "hesitate")
+
+                if role == "no" and duration >= skip_sec:
                     if current_state == State.SCAN:
                         return self._emit_once(device_id, "skip")
                     if current_state == State.CONFIRM:
@@ -669,6 +678,11 @@ class ScanningCoordinator:
 
         if action == "emergency":
             self._enter_alert()
+            return
+
+        if action == "hesitate":
+            if self.state == State.SCAN:
+                self._dwell_start = time.time()
             return
 
         if action == "select":
