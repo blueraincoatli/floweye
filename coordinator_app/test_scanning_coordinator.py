@@ -1,4 +1,5 @@
 import unittest
+import unittest.mock as mock
 from pathlib import Path
 import sys
 import types
@@ -118,6 +119,13 @@ class CoordinatorStateMachineTest(unittest.TestCase):
         self.coordinator._on_message(None, None, status_msg)
 
         self.assertEqual(handled, [("gaze", "test-device"), ("status", "test-device")])
+
+
+    def test_idle_published_on_reset(self):
+        self.coordinator.mqtt_client = mock.MagicMock()
+        self.coordinator.mqtt_client.is_connected.return_value = True
+        self.coordinator._reset_to_idle()
+        self.assertTrue(self.coordinator.mqtt_client.publish.called)
 
 
 class GazeInterpreterTest(unittest.TestCase):

@@ -257,8 +257,13 @@ class TTSEngine:
         if _PYTTSX3_AVAILABLE and pyttsx3 is not None:
             try:
                 self._engine = pyttsx3.init()
-                self._engine.setProperty("rate", self._config.get_param("tts.rate", 120))
-                self._engine.setProperty("volume", self._config.get_param("tts.volume", 0.8))
+                self._engine.setProperty("rate", self._config.get_param("tts.rate", 150))
+                self._engine.setProperty("volume", self._config.get_param("tts.volume", 1.0))
+                # 优先使用中文语音
+                for v in self._engine.getProperty("voices"):
+                    if "CN" in v.id or "ZH" in v.id or "Chinese" in v.name:
+                        self._engine.setProperty("voice", v.id)
+                        break
             except Exception as e:
                 logger.warning("TTS init failed: %s", e)
                 self._engine = None
@@ -297,7 +302,20 @@ class TTSEngine:
             with self._lock:
                 try:
                     self._engine.setProperty("volume", self._get_volume())
-                    self._engine.say(text)
+                    # 收集队列中所有待播文本，一次runAndWait播完
+                    texts = [text]
+                    while True:
+                        try:
+                            extra = self._queue.get_nowait()
+                            if extra is None:
+                                self._queue.task_done()
+                                break
+                            texts.append(extra)
+                            self._queue.task_done()
+                        except queue.Empty:
+                            break
+                    for t in texts:
+                        self._engine.say(t)
                     self._engine.runAndWait()
                 except Exception as e:
                     logger.warning("TTS speak failed: %s", e)
@@ -699,6 +717,54 @@ class ScanningCoordinator:
         # For simplicity, return to IDLE after TTS finishes
         self._reset_to_idle()
 
+    def _publish_scan_progress(self, option: Optional[dict]) -> None:
+        """发布当前扫描的选项到手机端显示"""
+        if self.mqtt_client is None or not self.mqtt_client.is_connected():
+            return
+        payload = {
+            "type": "scan_progress",
+            "timestamp": int(time.time() * 1000),
+            "activeDevices": self.device_mgr.get_online_count(),
+        }
+        if option:
+            payload["optionId"] = option.get("id")
+            payload["optionLabel"] = option.get("label")
+            payload["ttsPrompt"] = option.get("tts_prompt", "")
+        try:
+            self.mqtt_client.publish(self.topics["coordination"], json.dumps(payload, ensure_ascii=False), qos=1)
+        except Exception as e:
+            logger.error("Publish scan progress failed: %s", e)
+
+    def _publish_idle(self) -> None:
+        """发布空闲状态，通知手机回到待机界面"""
+        if self.mqtt_client is None or not self.mqtt_client.is_connected():
+            return
+        payload = {
+            "type": "idle",
+            "timestamp": int(time.time() * 1000),
+            "activeDevices": self.device_mgr.get_online_count(),
+        }
+        try:
+            self.mqtt_client.publish(self.topics["coordination"], json.dumps(payload, ensure_ascii=False), qos=1)
+        except Exception as e:
+            logger.error("Publish idle failed: %s", e)
+
+    def _publish_executed(self, option: dict) -> None:
+        """发布执行结果，手机显示反馈"""
+        if self.mqtt_client is None or not self.mqtt_client.is_connected():
+            return
+        payload = {
+            "type": "executed",
+            "timestamp": int(time.time() * 1000),
+            "activeDevices": self.device_mgr.get_online_count(),
+            "optionId": option.get("id"),
+            "optionLabel": option.get("label"),
+        }
+        try:
+            self.mqtt_client.publish(self.topics["coordination"], json.dumps(payload, ensure_ascii=False), qos=1)
+        except Exception as e:
+            logger.error("Publish executed failed: %s", e)
+
     def _enter_scan(self) -> None:
         self.state = State.SCAN
         self.menu_engine.reset()
@@ -708,8 +774,10 @@ class ScanningCoordinator:
         option = self.menu_engine.get_current_option()
         if option:
             self.tts.speak(option.get("tts_prompt", option.get("label", "")))
+            self._publish_scan_progress(option)
         else:
             self.tts.speak("\u8bf7\u9009\u62e9")
+            self._publish_scan_progress(None)
 
     def _enter_confirm(self, option: dict) -> None:
         self.state = State.CONFIRM
@@ -717,6 +785,7 @@ class ScanningCoordinator:
         self._dwell_start = time.time()
         prompt = option.get("tts_prompt", option.get("label", ""))
         self.tts.speak("\u786e\u8ba4" + prompt)
+        self.publish_decision("confirm", option)
 
     def _execute_selection(self) -> None:
         if self._confirm_option:
@@ -726,6 +795,7 @@ class ScanningCoordinator:
         self.menu_engine.record_selection(option.get("id", "unknown"))
         urgency = option.get("urgency", "normal")
         self.publish_decision("selection", option, urgency=urgency)
+        self._publish_executed(option)
         self.tts.speak("\u5df2\u901a\u77e5")
         self.state = State.WAITING
         self._dwell_start = time.time()
@@ -739,6 +809,7 @@ class ScanningCoordinator:
         self._dwell_start = time.time()
         if option:
             self.tts.speak(option.get("tts_prompt", option.get("label", "")))
+            self._publish_scan_progress(option)
 
     def _cancel_confirm(self) -> None:
         self._confirm_option = None
@@ -747,6 +818,7 @@ class ScanningCoordinator:
         option = self.menu_engine.get_current_option()
         if option:
             self.tts.speak(option.get("tts_prompt", option.get("label", "")))
+            self._publish_scan_progress(option)
 
     def _reset_to_idle(self) -> None:
         self.state = State.IDLE
@@ -754,6 +826,7 @@ class ScanningCoordinator:
         self.gaze.reset()
         self._confirm_option = None
         self._round_count = 0
+        self._publish_idle()
 
     # --- Scan Loop ---
 
@@ -792,6 +865,7 @@ class ScanningCoordinator:
                             continue
 
                     self.tts.speak(option.get("tts_prompt", option.get("label", "")))
+                    self._publish_scan_progress(option)
 
             elif state == State.CONFIRM:
                 if now - self._dwell_start >= self._get_confirm_timeout():

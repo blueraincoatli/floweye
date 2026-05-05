@@ -21,8 +21,8 @@
     "min_dwell_seconds": 3
   },
   "tts": {
-    "rate": 120,
-    "volume": 0.8,
+    "rate": 150,
+    "volume": 1.0,
     "night_volume": 0.4,
     "night_start_hour": 22,
     "night_end_hour": 6
