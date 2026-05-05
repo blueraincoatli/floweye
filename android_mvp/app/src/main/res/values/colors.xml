@@ -46,4 +46,7 @@
 
     <!-- 启动图标背景 -->
     <color name="ic_launcher_background">#FF1E1E2E</color>
+
+    <!-- 空闲态暖色背景 -->
+    <color name="background_warm">#FF3D3D2E</color>
 </resources>

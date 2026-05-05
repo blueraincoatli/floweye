@@ -2,6 +2,7 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_dark"
@@ -37,6 +38,21 @@
             android:text="@string/connecting_mqtt" />
     </LinearLayout>
 
+    <!-- 选项名（扫描态显示） -->
+    <TextView
+        android:id="@+id/optionNameText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="28sp"
+        android:textColor="@color/text_primary"
+        android:gravity="center"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/mainButton"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/statusLayout" />
+
     <!-- 底部信息区域 -->
     <LinearLayout
         android:id="@+id/bottomInfo"
@@ -69,6 +85,15 @@
             style="@style/StatusTextStyle"
             android:text="设备ID: 未设置"
             android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/menuOptionText"
+            style="@style/StatusTextStyle"
+            android:text=""
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            android:layout_marginTop="6dp" />
     </LinearLayout>
 
     <!-- 单按钮 - 占满中央区域 -->
@@ -80,7 +105,23 @@
         android:layout_margin="12dp"
         android:text="是"
         android:background="@drawable/btn_yes_normal"
-        app:layout_constraintTop_toBottomOf="@id/statusLayout"
+        app:layout_constraintTop_toBottomOf="@id/optionNameText"
+        app:layout_constraintBottom_toTopOf="@id/dwellProgressBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 进度条（扫描/确认态显示） -->
+    <ProgressBar
+        android:id="@+id/dwellProgressBar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:max="100"
+        android:progress="100"
+        android:visibility="gone"
+        android:progressDrawable="@drawable/progress_bar_gaze"
         app:layout_constraintBottom_toTopOf="@id/bottomInfo"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
