@@ -779,12 +779,33 @@ class ScanningCoordinator:
         except Exception as e:
             logger.error("Publish executed failed: %s", e)
 
+    def _publish_transition(self) -> None:
+        """\u53d1\u5e03\u8fc7\u6e21\u72b6\u6001\uff0c\u624b\u673a\u6e05\u5c4f"""
+        if self.mqtt_client is None or not self.mqtt_client.is_connected():
+            return
+        payload = {
+            "type": "transition",
+            "timestamp": int(time.time() * 1000),
+            "activeDevices": self.device_mgr.get_online_count(),
+        }
+        try:
+            self.mqtt_client.publish(
+                self.topics["coordination"],
+                json.dumps(payload, ensure_ascii=False), qos=1)
+        except Exception as e:
+            logger.error("Publish transition failed: %s", e)
+
     def _enter_scan(self) -> None:
         self.state = State.SCAN
         self.menu_engine.reset()
         self._round_count = 0
         self._dwell_start = time.time()
         self._option_started = time.time()
+        # \u8fc7\u6e21\uff1a\u6e05\u7a7a\u5c4f\u5e55 + TTS\u63d0\u793a
+        self._publish_transition()
+        self.tts.speak("\u5373\u5c06\u64ad\u653e\u9009\u9879")
+        time.sleep(1)
+        # \u5f00\u59cb\u64ad\u62a5\u7b2c\u4e00\u4e2a\u9009\u9879
         option = self.menu_engine.get_current_option()
         if option:
             self.tts.speak(option.get("tts_prompt", option.get("label", "")))
