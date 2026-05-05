@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.media.AudioAttributes
+import android.media.SoundPool
 import android.os.Bundle
 import android.util.Log
 import android.view.SurfaceView
@@ -67,6 +69,14 @@ class MainActivity : AppCompatActivity(),
     private lateinit var roleButton: FloatingActionButton
     private lateinit var optionNameText: TextView
     private lateinit var dwellProgressBar: android.widget.ProgressBar
+
+    // ---------- 音效 ----------
+    private var soundPool: SoundPool? = null
+    private var soundDingDong = 0
+    private var soundWhoosh = 0
+
+    // ---------- 层级颜色 ----------
+    private var currentMenuDepth = 0
 
     // ---------- 调试叠加层 ----------
     private var debugPanel: FrameLayout? = null
@@ -170,6 +180,15 @@ class MainActivity : AppCompatActivity(),
 
         deviceIdText.text = "设备ID: $deviceId"
 
+        // 音效池
+        val audioAttrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        soundPool = SoundPool.Builder().setMaxStreams(2).setAudioAttributes(audioAttrs).build()
+        soundDingDong = soundPool?.load(this, R.raw.ding_dong, 1) ?: 0
+        soundWhoosh = soundPool?.load(this, R.raw.whoosh, 1) ?: 0
+
         // 调试叠加层
         debugPanel = findViewById(R.id.debugPanel)
         debugSurfaceView = findViewById(R.id.debugSurfaceView)
@@ -183,6 +202,45 @@ class MainActivity : AppCompatActivity(),
                 lastClickTime = now
             }
         })
+    }
+
+    private fun getButtonColors(isConfirm: Boolean = false): Pair<Int, Int> {
+        val depth = if (isConfirm) -1 else currentMenuDepth
+        val isYes = deviceRole == "yes"
+        return when {
+            isConfirm -> {
+                if (isYes)
+                    Pair(ContextCompat.getColor(this, R.color.yes_normal_cf),
+                         ContextCompat.getColor(this, R.color.yes_gaze_cf))
+                else
+                    Pair(ContextCompat.getColor(this, R.color.no_normal_cf),
+                         ContextCompat.getColor(this, R.color.no_gaze_cf))
+            }
+            depth == 0 -> {
+                if (isYes)
+                    Pair(ContextCompat.getColor(this, R.color.yes_normal_l0),
+                         ContextCompat.getColor(this, R.color.yes_gaze_l0))
+                else
+                    Pair(ContextCompat.getColor(this, R.color.no_normal_l0),
+                         ContextCompat.getColor(this, R.color.no_gaze_l0))
+            }
+            depth == 1 -> {
+                if (isYes)
+                    Pair(ContextCompat.getColor(this, R.color.yes_normal_l1),
+                         ContextCompat.getColor(this, R.color.yes_gaze_l1))
+                else
+                    Pair(ContextCompat.getColor(this, R.color.no_normal_l1),
+                         ContextCompat.getColor(this, R.color.no_gaze_l1))
+            }
+            else -> {
+                if (isYes)
+                    Pair(ContextCompat.getColor(this, R.color.yes_normal_l2),
+                         ContextCompat.getColor(this, R.color.yes_gaze_l2))
+                else
+                    Pair(ContextCompat.getColor(this, R.color.no_normal_l2),
+                         ContextCompat.getColor(this, R.color.no_gaze_l2))
+            }
+        }
     }
 
     private fun updateUIForState() {
@@ -226,18 +284,12 @@ class MainActivity : AppCompatActivity(),
                     mainButton.visibility = View.VISIBLE
                     mainButton.text = label
                     mainButton.setTextColor(ContextCompat.getColor(this, R.color.text_on_primary))
-                    if (isLookingAtScreen) {
-                        mainButton.setBackgroundResource(
-                            if (deviceRole == "yes") R.drawable.btn_yes_gaze else R.drawable.btn_no_gaze
-                        )
-                    } else {
-                        mainButton.setBackgroundResource(
-                            if (deviceRole == "yes") R.drawable.btn_yes_normal else R.drawable.btn_no_normal
-                        )
-                    }
+                    dwellProgressBar.visibility = View.VISIBLE
+                    val (normalColor, gazeColor) = getButtonColors()
+                    mainButton.setBackgroundColor(if (isLookingAtScreen) gazeColor else normalColor)
                 }
                 optionNameText.visibility = View.VISIBLE
-                try { rootLayout.setBackgroundResource(R.color.background_dark) } catch (_: Exception) {}
+                applyDepthColor(currentMenuDepth)
                 stopBreathingAnimation()
             }
             ScreenState.CONFIRM -> {
@@ -246,18 +298,11 @@ class MainActivity : AppCompatActivity(),
                 mainButton.visibility = View.VISIBLE
                 mainButton.text = label
                 mainButton.setTextColor(ContextCompat.getColor(this, R.color.text_on_primary))
-                if (isLookingAtScreen) {
-                    mainButton.setBackgroundResource(
-                        if (deviceRole == "yes") R.drawable.btn_yes_gaze else R.drawable.btn_no_gaze
-                    )
-                } else {
-                    mainButton.setBackgroundResource(
-                        if (deviceRole == "yes") R.drawable.btn_yes_normal else R.drawable.btn_no_normal
-                    )
-                }
+                val (normalColor, gazeColor) = getButtonColors(isConfirm = true)
+                mainButton.setBackgroundColor(if (isLookingAtScreen) gazeColor else normalColor)
                 optionNameText.visibility = View.VISIBLE
                 dwellProgressBar.visibility = View.VISIBLE
-                try { rootLayout.setBackgroundResource(R.color.background_dark) } catch (_: Exception) {}
+                applyDepthColor(99)
                 stopBreathingAnimation()
             }
             ScreenState.FEEDBACK -> {
@@ -277,20 +322,51 @@ class MainActivity : AppCompatActivity(),
     private var progressJob: Job? = null
     private var delayedUiJob: kotlinx.coroutines.Job? = null
 
-    private fun startProgressBar(durationSeconds: Int = 5) {
-        progressJob?.cancel()
-        progressJob = lifecycleScope.launch {
-            val totalMs = durationSeconds * 1000L
-            val interval = 50L
-            var elapsed = 0L
-            while (elapsed < totalMs) {
-                val progress = ((totalMs - elapsed) * 100 / totalMs).toInt()
-                dwellProgressBar.progress = progress
-                delay(interval)
-                elapsed += interval
+    private fun applyDepthColor(depth: Int) {
+        val rootLayout = findViewById<android.view.View>(R.id.rootLayout)
+        when {
+            depth == 0 -> {
+                rootLayout.setBackgroundColor(ContextCompat.getColor(this, R.color.bg_level_0))
+                optionNameText.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
             }
-            dwellProgressBar.progress = 0
+            depth == 1 -> {
+                rootLayout.setBackgroundColor(ContextCompat.getColor(this, R.color.bg_level_1))
+                optionNameText.setTextColor(ContextCompat.getColor(this, R.color.text_level_1))
+            }
+            depth >= 2 -> {
+                rootLayout.setBackgroundColor(ContextCompat.getColor(this, R.color.bg_level_2))
+                optionNameText.setTextColor(ContextCompat.getColor(this, R.color.text_level_2))
+            }
+            depth == 99 -> {
+                rootLayout.setBackgroundColor(ContextCompat.getColor(this, R.color.bg_confirm))
+                optionNameText.setTextColor(ContextCompat.getColor(this, R.color.text_confirm))
+            }
         }
+    }
+
+    private val gazeProgressThresholdMs = 1500L  // 1.5秒注视阈值
+    private var gazeStartTime = 0L
+
+    private fun startGazeProgress() {
+        progressJob?.cancel()
+        gazeStartTime = if (isLookingAtScreen) System.currentTimeMillis() else 0L
+        progressJob = lifecycleScope.launch {
+            val interval = 50L
+            while (isActive) {
+                if (isLookingAtScreen && gazeStartTime > 0) {
+                    val elapsed = System.currentTimeMillis() - gazeStartTime
+                    val progress = (elapsed * 100 / gazeProgressThresholdMs).toInt().coerceAtMost(100)
+                    dwellProgressBar.progress = progress
+                } else {
+                    dwellProgressBar.progress = 0
+                }
+                delay(interval)
+            }
+        }
+    }
+
+    private fun startProgressBar(durationSeconds: Int = 5) {
+        startGazeProgress()
     }
 
     private var breathingJob: Job? = null
@@ -471,6 +547,7 @@ class MainActivity : AppCompatActivity(),
         runOnUiThread {
             isLookingAtScreen = true
             currentConfidence = confidence
+            gazeStartTime = System.currentTimeMillis()
             updateUI()
             publishState()
             startPeriodicPublish()
@@ -481,6 +558,7 @@ class MainActivity : AppCompatActivity(),
         runOnUiThread {
             isLookingAtScreen = false
             currentConfidence = 0.0f
+            gazeStartTime = 0L
             updateUI()
             publishState()
             stopPeriodicPublish()
@@ -588,10 +666,13 @@ class MainActivity : AppCompatActivity(),
         try {
             val json = org.json.JSONObject(message)
             val type = json.optString("type", "")
+            val depth = json.optInt("menuDepth", 0)
             runOnUiThread {
+                currentMenuDepth = depth
                 when (type) {
                     "idle" -> {
                         screenState = ScreenState.IDLE
+                        currentMenuDepth = 0
                         progressJob?.cancel()
                         delayedUiJob?.cancel()
                         updateUIForState()
@@ -613,6 +694,7 @@ class MainActivity : AppCompatActivity(),
                         progressJob?.cancel()
                         val label = json.optString("optionLabel", "")
                         optionNameText.text = label
+                        applyDepthColor(depth)
                         gazeStatus.text = ""
                         updateUIForState()
                     }
@@ -623,6 +705,7 @@ class MainActivity : AppCompatActivity(),
                         delayedUiJob?.cancel()
                         val label = json.optString("optionLabel", "")
                         optionNameText.text = label
+                        applyDepthColor(depth)
                         gazeStatus.text = "注视[${if (deviceRole == "yes") "是" else "否"}]${if (deviceRole == "yes") "选择" else "跳过"}此项"
                         updateUIForState()
                         dwellProgressBar.visibility = View.VISIBLE
@@ -634,9 +717,21 @@ class MainActivity : AppCompatActivity(),
                         delayedUiJob?.cancel()
                         val label = json.optString("optionLabel", "")
                         optionNameText.text = "确认: $label"
+                        applyDepthColor(99) // 确认层
                         gazeStatus.text = "注视「是」确认选择"
                         updateUIForState()
                         startProgressBar(10)
+                    }
+                    "action_feedback" -> {
+                        val action = json.optString("action", "")
+                        when (action) {
+                            "select", "confirm" -> {
+                                soundPool?.play(soundDingDong, 1f, 1f, 1, 0, 1f)
+                            }
+                            "skip", "cancel" -> {
+                                soundPool?.play(soundWhoosh, 1f, 1f, 1, 0, 1f)
+                            }
+                        }
                     }
                     "skip_feedback" -> {
                         // "否"设备注视跳过反馈
@@ -666,6 +761,7 @@ class MainActivity : AppCompatActivity(),
                         lifecycleScope.launch {
                             delay(2000)
                             screenState = ScreenState.IDLE
+                            currentMenuDepth = 0
                             updateUIForState()
                         }
                     }

@@ -49,4 +49,42 @@
 
     <!-- 空闲态暖色背景 -->
     <color name="background_warm">#FF3D3D2E</color>
+
+    <!-- 层级背景色 -->
+    <color name="bg_level_0">#FF1E1E2E</color>
+    <color name="bg_level_1">#FF0D2137</color>
+    <color name="bg_level_2">#FF0D3320</color>
+    <color name="bg_confirm">#FF331A2E</color>
+
+    <!-- 层级选项文字色 -->
+    <color name="text_level_1">#FF90CAF9</color>
+    <color name="text_level_2">#FFA5D6A7</color>
+    <color name="text_confirm">#FFCE93D8</color>
+
+    <!-- 层级按钮颜色：是/否 每层不同 -->
+    <!-- Level 0 是: 蓝调 -->
+    <color name="yes_normal_l0">#FF2E4057</color>
+    <color name="yes_gaze_l0">#FF4A90D9</color>
+    <!-- Level 1 是: 绿调 -->
+    <color name="yes_normal_l1">#FF2E5740</color>
+    <color name="yes_gaze_l1">#FF4AD97A</color>
+    <!-- Level 2 是: 橙调 -->
+    <color name="yes_normal_l2">#FF57402E</color>
+    <color name="yes_gaze_l2">#FFD9A04A</color>
+    <!-- Confirm 是: 紫调 -->
+    <color name="yes_normal_cf">#FF402E57</color>
+    <color name="yes_gaze_cf">#FF904AD9</color>
+
+    <!-- Level 0 否 -->
+    <color name="no_normal_l0">#FF57312E</color>
+    <color name="no_gaze_l0">#FFD9564A</color>
+    <!-- Level 1 否 -->
+    <color name="no_normal_l1">#FF57312E</color>
+    <color name="no_gaze_l1">#FFD9564A</color>
+    <!-- Level 2 否 -->
+    <color name="no_normal_l2">#FF57312E</color>
+    <color name="no_gaze_l2">#FFD9564A</color>
+    <!-- Cancel 否 -->
+    <color name="no_normal_cf">#FF57312E</color>
+    <color name="no_gaze_cf">#FFD9564A</color>
 </resources>

@@ -456,6 +456,17 @@ class GazeInterpreter:
             self._device_action_latched.clear()
             self._yes_history.clear()
 
+    def clear_latch(self, device_id: str) -> None:
+        """清除指定设备的 action latch，不重置注视时长"""
+        with self._lock:
+            self._device_action_latched.pop(device_id, None)
+            self._device_hesitate_latched.pop(device_id, None)
+
+    def reset_gaze_start(self) -> None:
+        """重置所有设备的注视计时起点（选项切换时使用）"""
+        with self._lock:
+            self._device_gaze_start.clear()
+
 
 class DeviceManager:
     def __init__(self):
@@ -662,13 +673,17 @@ class ScanningCoordinator:
             current_state=self.state,
             current_option=option,
         )
-        logger.debug("GAZE %s role=%s looking=%s conf=%.2f state=%s scan_phase=%s action=%s",
-                     device_id[:12], role, is_looking, confidence,
-                     self.state.name if hasattr(self.state, 'name') else self.state,
-                     self._scan_phase,
-                     action)
+        if is_looking or action:
+            logger.info("GAZE %s role=%s looking=%s conf=%.2f state=%s scan_phase=%s action=%s",
+                         device_id[:12], role, is_looking, confidence,
+                         self.state.name if hasattr(self.state, 'name') else self.state,
+                         self._scan_phase,
+                         action)
         # 播报阶段不处理任何注视动作，避免误触发
-        if action and self._scan_phase != "announce":
+        # 同时清除 announce 期间误设的 latch，防止阻断后续 select
+        if action and self._scan_phase == "announce":
+            self.gaze.clear_latch(device_id)
+        elif action:
             self._handle_action(action, param)
 
     def _handle_device_status(self, data: dict) -> None:
@@ -706,6 +721,7 @@ class ScanningCoordinator:
             "timestamp": int(time.time() * 1000),
             "activeDevices": active_count,
             "urgency": urgency,
+            "menuDepth": len(self.menu_engine._path),
         }
         if option:
             payload["optionId"] = option.get("id")
@@ -715,6 +731,20 @@ class ScanningCoordinator:
             self.mqtt_client.publish(self.topics["coordination"], json.dumps(payload, ensure_ascii=False), qos=1)
         except Exception as e:
             logger.error("Publish decision failed: %s", e)
+
+    def _publish_action_feedback(self, action_type: str) -> None:
+        """发布操作反馈消息，触发手机端音效和视觉反馈"""
+        if self.mqtt_client is None or not self.mqtt_client.is_connected():
+            return
+        payload = {
+            "type": "action_feedback",
+            "action": action_type,
+            "timestamp": int(time.time() * 1000),
+        }
+        try:
+            self.mqtt_client.publish(self.topics["coordination"], json.dumps(payload, ensure_ascii=False), qos=1)
+        except Exception as e:
+            logger.error("Publish action feedback failed: %s", e)
 
     # --- State Machine ---
 
@@ -744,6 +774,7 @@ class ScanningCoordinator:
             selected, is_leaf = self.menu_engine.select_current()
             if selected is None:
                 return
+            self._publish_action_feedback("select")
             if not is_leaf:
                 # Entered submenu, announce first option
                 self.gaze.reset()  # 清除 latch，允许子菜单中的新选择
@@ -761,17 +792,20 @@ class ScanningCoordinator:
             return
 
         if action == "confirm":
+            self._publish_action_feedback("confirm")
             if self._confirm_option:
                 self._execute_option(self._confirm_option)
             return
 
         if action == "skip":
             if self.state == State.SCAN:
+                self._publish_action_feedback("skip")
                 self._skip_current()
             return
 
         if action == "cancel":
             if self.state == State.CONFIRM:
+                self._publish_action_feedback("cancel")
                 self._cancel_confirm()
             return
 
@@ -791,6 +825,7 @@ class ScanningCoordinator:
             "type": "scan_progress",
             "timestamp": int(time.time() * 1000),
             "activeDevices": self.device_mgr.get_online_count(),
+            "menuDepth": len(self.menu_engine._path),
         }
         if option:
             payload["optionId"] = option.get("id")
@@ -809,6 +844,7 @@ class ScanningCoordinator:
             "type": "idle",
             "timestamp": int(time.time() * 1000),
             "activeDevices": self.device_mgr.get_online_count(),
+            "menuDepth": 0,
         }
         try:
             self.mqtt_client.publish(self.topics["coordination"], json.dumps(payload, ensure_ascii=False), qos=1)
@@ -823,6 +859,7 @@ class ScanningCoordinator:
             "type": "executed",
             "timestamp": int(time.time() * 1000),
             "activeDevices": self.device_mgr.get_online_count(),
+            "menuDepth": len(self.menu_engine._path),
             "optionId": option.get("id"),
             "optionLabel": option.get("label"),
         }
@@ -839,6 +876,7 @@ class ScanningCoordinator:
             "type": "transition",
             "timestamp": int(time.time() * 1000),
             "activeDevices": self.device_mgr.get_online_count(),
+            "menuDepth": len(self.menu_engine._path),
         }
         try:
             self.mqtt_client.publish(
@@ -962,6 +1000,7 @@ class ScanningCoordinator:
 
         if self._scan_phase == "announce":
             self._scan_phase = "select"
+            self.gaze.reset_gaze_start()  # 重置注视计时，确保需要重新注视1.5秒
             now = time.time()
             self._dwell_start = now
             self._option_started = now
@@ -976,6 +1015,7 @@ class ScanningCoordinator:
             "type": "announce",
             "timestamp": int(time.time() * 1000),
             "activeDevices": self.device_mgr.get_online_count(),
+            "menuDepth": len(self.menu_engine._path),
             "optionId": option.get("id"),
             "optionLabel": option.get("label"),
             "ttsPrompt": option.get("tts_prompt", ""),
