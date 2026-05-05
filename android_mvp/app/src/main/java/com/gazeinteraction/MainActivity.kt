@@ -100,6 +100,7 @@ class MainActivity : AppCompatActivity(),
     private var isLookingAtScreen = false
     private var currentConfidence: Float = 0.0f
     private var screenState = ScreenState.IDLE
+    private var isAnnouncing = false  // 播报阶段：隐藏按钮，只显示选项文字
 
     // ---------- MQTT 节流 ----------
     private var lastPublishedLooking = false
@@ -188,7 +189,10 @@ class MainActivity : AppCompatActivity(),
         val rootLayout = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.rootLayout)
         when (screenState) {
             ScreenState.IDLE -> {
+                isAnnouncing = false
+                mainButton.visibility = View.VISIBLE
                 mainButton.text = "你好"
+                mainButton.setTextColor(ContextCompat.getColor(this, R.color.text_on_primary))
                 mainButton.setBackgroundResource(R.drawable.btn_yes_normal)
                 optionNameText.visibility = View.GONE
                 dwellProgressBar.visibility = View.GONE
@@ -198,7 +202,10 @@ class MainActivity : AppCompatActivity(),
                 gazeStatus.text = "注视屏幕开始"
             }
             ScreenState.TRANSITION -> {
+                isAnnouncing = false
+                mainButton.visibility = View.VISIBLE
                 mainButton.text = ""
+                mainButton.setTextColor(ContextCompat.getColor(this, R.color.text_on_primary))
                 mainButton.setBackgroundResource(R.drawable.btn_yes_normal)
                 optionNameText.visibility = View.GONE
                 dwellProgressBar.visibility = View.GONE
@@ -207,25 +214,38 @@ class MainActivity : AppCompatActivity(),
                 stopBreathingAnimation()
             }
             ScreenState.SCAN -> {
-                val label = if (deviceRole == "yes") "是" else "否"
-                mainButton.text = label
-                if (isLookingAtScreen) {
-                    mainButton.setBackgroundResource(
-                        if (deviceRole == "yes") R.drawable.btn_yes_gaze else R.drawable.btn_no_gaze
-                    )
+                if (isAnnouncing) {
+                    // 播报阶段：只显示选项文字，隐藏按钮
+                    mainButton.visibility = View.GONE
+                    dwellProgressBar.visibility = View.GONE
+                    stopBreathingAnimation()
+                    mainButton.alpha = 1.0f
                 } else {
-                    mainButton.setBackgroundResource(
-                        if (deviceRole == "yes") R.drawable.btn_yes_normal else R.drawable.btn_no_normal
-                    )
+                    // 选择阶段：显示是/否按钮
+                    val label = if (deviceRole == "yes") "是" else "否"
+                    mainButton.visibility = View.VISIBLE
+                    mainButton.text = label
+                    mainButton.setTextColor(ContextCompat.getColor(this, R.color.text_on_primary))
+                    if (isLookingAtScreen) {
+                        mainButton.setBackgroundResource(
+                            if (deviceRole == "yes") R.drawable.btn_yes_gaze else R.drawable.btn_no_gaze
+                        )
+                    } else {
+                        mainButton.setBackgroundResource(
+                            if (deviceRole == "yes") R.drawable.btn_yes_normal else R.drawable.btn_no_normal
+                        )
+                    }
                 }
                 optionNameText.visibility = View.VISIBLE
-                dwellProgressBar.visibility = View.VISIBLE
                 try { rootLayout.setBackgroundResource(R.color.background_dark) } catch (_: Exception) {}
                 stopBreathingAnimation()
             }
             ScreenState.CONFIRM -> {
+                isAnnouncing = false
                 val label = if (deviceRole == "yes") "是" else "否"
+                mainButton.visibility = View.VISIBLE
                 mainButton.text = label
+                mainButton.setTextColor(ContextCompat.getColor(this, R.color.text_on_primary))
                 if (isLookingAtScreen) {
                     mainButton.setBackgroundResource(
                         if (deviceRole == "yes") R.drawable.btn_yes_gaze else R.drawable.btn_no_gaze
@@ -241,7 +261,10 @@ class MainActivity : AppCompatActivity(),
                 stopBreathingAnimation()
             }
             ScreenState.FEEDBACK -> {
+                isAnnouncing = false
+                mainButton.visibility = View.VISIBLE
                 mainButton.text = ""
+                mainButton.setTextColor(ContextCompat.getColor(this, R.color.text_on_primary))
                 mainButton.setBackgroundResource(R.drawable.btn_yes_normal)
                 optionNameText.visibility = View.VISIBLE
                 dwellProgressBar.visibility = View.GONE
@@ -252,6 +275,7 @@ class MainActivity : AppCompatActivity(),
     }
 
     private var progressJob: Job? = null
+    private var delayedUiJob: kotlinx.coroutines.Job? = null
 
     private fun startProgressBar(durationSeconds: Int = 5) {
         progressJob?.cancel()
@@ -345,18 +369,30 @@ class MainActivity : AppCompatActivity(),
 
     private fun initializeComponents() {
         lifecycleScope.launch {
+            // 确保初始UI正确显示
+            runOnUiThread { updateUIForState() }
+
+            // 1. MediaPipe (在IO线程加载模型，避免阻塞主线程)
             try {
-                // 1. MediaPipe (在IO线程加载模型，避免阻塞主线程)
                 updateStatus(mediapipeStatus, "初始化中...", Color.YELLOW)
                 faceLandmarkerHelper = FaceLandmarkerHelper(this@MainActivity, this@MainActivity)
                 withContext(Dispatchers.IO) { faceLandmarkerHelper.initialize() }
                 updateStatus(mediapipeStatus, "就绪", Color.GREEN)
+            } catch (e: Exception) {
+                Log.e(TAG, "MediaPipe初始化失败", e)
+                updateStatus(mediapipeStatus, "错误", Color.RED)
+            }
 
-                // 2. 视线算法
+            // 2. 视线算法（不依赖外部资源，不太可能失败）
+            try {
                 gazeDetectionAlgorithm = GazeDetectionAlgorithm(this@MainActivity)
                 gazeDetectionAlgorithm.setGazeListener(this@MainActivity)
+            } catch (e: Exception) {
+                Log.e(TAG, "视线算法初始化失败", e)
+            }
 
-                // 3. 摄像头
+            // 3. 摄像头
+            try {
                 updateStatus(cameraStatus, "初始化中...", Color.YELLOW)
                 cameraManager = CameraManager(this@MainActivity)
                 cameraManager.initialize { bitmap ->
@@ -364,13 +400,19 @@ class MainActivity : AppCompatActivity(),
                 }
                 cameraManager.startCamera()
                 updateStatus(cameraStatus, "就绪", Color.GREEN)
+            } catch (e: Exception) {
+                Log.e(TAG, "摄像头初始化失败", e)
+                updateStatus(cameraStatus, "错误", Color.RED)
+            }
 
-                // 4. MQTT
+            // 4. MQTT
+            try {
                 updateStatus(mqttStatus, "连接中...", Color.YELLOW)
                 mqttClient = MqttClient(this@MainActivity, deviceId)
                 mqttClient.connectionListener = object : MqttClient.ConnectionListener {
                     override fun onConnected() {
                         updateStatus(mqttStatus, "已连接", Color.GREEN)
+                        startPeriodicPublish()
                     }
                     override fun onDisconnected() {
                         updateStatus(mqttStatus, "已断开", Color.RED)
@@ -383,11 +425,10 @@ class MainActivity : AppCompatActivity(),
                     }
                 }
                 mqttClient.connect()
-                updateStatus(mqttStatus, "已连接", Color.GREEN)
-
+                // MQTT 连接是异步的，不在这里标记成功，等回调
             } catch (e: Exception) {
-                Log.e(TAG, "初始化失败", e)
-                Toast.makeText(this@MainActivity, "初始化失败: ${e.message}", Toast.LENGTH_LONG).show()
+                Log.e(TAG, "MQTT初始化失败", e)
+                updateStatus(mqttStatus, "错误", Color.RED)
             }
         }
     }
@@ -432,6 +473,7 @@ class MainActivity : AppCompatActivity(),
             currentConfidence = confidence
             updateUI()
             publishState()
+            startPeriodicPublish()
         }
     }
 
@@ -441,7 +483,25 @@ class MainActivity : AppCompatActivity(),
             currentConfidence = 0.0f
             updateUI()
             publishState()
+            stopPeriodicPublish()
         }
+    }
+
+    // ---------- 持续发布注视状态 ----------
+    private var periodicPublishJob: Job? = null
+
+    private fun startPeriodicPublish() {
+        if (periodicPublishJob?.isActive == true) return
+        periodicPublishJob = lifecycleScope.launch {
+            while (isActive) {
+                delay(PUBLISH_MIN_INTERVAL_MS)
+                publishState()
+            }
+        }
+    }
+
+    private fun stopPeriodicPublish() {
+        periodicPublishJob?.cancel()
     }
 
     // ==================== 校准 ====================
@@ -501,6 +561,7 @@ class MainActivity : AppCompatActivity(),
     // ==================== UI ====================
 
     private fun updateUI() {
+        confidenceText.text = "置信度: ${(currentConfidence * 100).toInt()}%"
         if (screenState == ScreenState.IDLE || screenState == ScreenState.TRANSITION) {
             if (isLookingAtScreen && screenState == ScreenState.IDLE) {
                 gazeStatus.text = "注视以唤醒"
@@ -511,7 +572,6 @@ class MainActivity : AppCompatActivity(),
             }
         } else {
             updateUIForState()
-            confidenceText.text = "置信度: ${(currentConfidence * 100).toInt()}%"
         }
     }
 
@@ -533,31 +593,63 @@ class MainActivity : AppCompatActivity(),
                     "idle" -> {
                         screenState = ScreenState.IDLE
                         progressJob?.cancel()
+                        delayedUiJob?.cancel()
                         updateUIForState()
                         menuOptionText.visibility = View.GONE
                     }
                     "transition" -> {
                         screenState = ScreenState.TRANSITION
                         progressJob?.cancel()
+                        delayedUiJob?.cancel()
                         updateUIForState()
                         gazeStatus.text = "即将播放选项..."
                         menuOptionText.visibility = View.GONE
                     }
-                    "scan_progress" -> {
+                    "announce" -> {
+                        // TTS 播报阶段：只显示选项文字，隐藏按钮
                         screenState = ScreenState.SCAN
-                        updateUIForState()
+                        isAnnouncing = true
+                        delayedUiJob?.cancel()
+                        progressJob?.cancel()
                         val label = json.optString("optionLabel", "")
                         optionNameText.text = label
-                        gazeStatus.text = "注视「是」选择此项"
-                        startProgressBar(5)
+                        gazeStatus.text = ""
+                        updateUIForState()
+                    }
+                    "scan_progress" -> {
+                        // TTS 播报完毕，显示按钮和进度条
+                        screenState = ScreenState.SCAN
+                        isAnnouncing = false
+                        delayedUiJob?.cancel()
+                        val label = json.optString("optionLabel", "")
+                        optionNameText.text = label
+                        gazeStatus.text = "注视[${if (deviceRole == "yes") "是" else "否"}]${if (deviceRole == "yes") "选择" else "跳过"}此项"
+                        updateUIForState()
+                        dwellProgressBar.visibility = View.VISIBLE
+                        startProgressBar(10)
                     }
                     "confirm" -> {
                         screenState = ScreenState.CONFIRM
-                        updateUIForState()
+                        isAnnouncing = false
+                        delayedUiJob?.cancel()
                         val label = json.optString("optionLabel", "")
                         optionNameText.text = "确认: $label"
                         gazeStatus.text = "注视「是」确认选择"
-                        startProgressBar(5)
+                        updateUIForState()
+                        startProgressBar(10)
+                    }
+                    "skip_feedback" -> {
+                        // "否"设备注视跳过反馈
+                        if (deviceRole == "no") {
+                            gazeStatus.text = "已跳过"
+                            mainButton.setTextColor(Color.parseColor("#FF9800"))
+                            delayedUiJob?.cancel()
+                            delayedUiJob = lifecycleScope.launch {
+                                delay(800)
+                                gazeStatus.text = ""
+                                updateUIForState()
+                            }
+                        }
                     }
                     "selection" -> {
                         val label = json.optString("optionLabel", "")
@@ -565,6 +657,7 @@ class MainActivity : AppCompatActivity(),
                     }
                     "executed" -> {
                         screenState = ScreenState.FEEDBACK
+                        delayedUiJob?.cancel()
                         updateUIForState()
                         val label = json.optString("optionLabel", "")
                         optionNameText.text = "已通知\n${label}"
@@ -593,9 +686,7 @@ class MainActivity : AppCompatActivity(),
 
     private fun publishState() {
         val now = System.currentTimeMillis()
-        if (isLookingAtScreen != lastPublishedLooking) {
-            // 状态变了，立即发布
-        } else if (now - lastPublishTimeMs < PUBLISH_MIN_INTERVAL_MS) {
+        if (now - lastPublishTimeMs < PUBLISH_MIN_INTERVAL_MS) {
             return
         }
 
@@ -634,6 +725,7 @@ class MainActivity : AppCompatActivity(),
     override fun onDestroy() {
         super.onDestroy()
         try {
+            periodicPublishJob?.cancel()
             if (::cameraManager.isInitialized) { cameraManager.setPreviewSurface(null); cameraManager.release() }
             if (::faceLandmarkerHelper.isInitialized) faceLandmarkerHelper.clearFaceLandmarker()
             if (::mqttClient.isInitialized) mqttClient.disconnect()

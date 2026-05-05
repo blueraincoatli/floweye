@@ -35,10 +35,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.GazeInteractionApp"
         tools:targetApi="31">
-        
-        <!-- MQTT服务 -->
-        <service android:name="org.eclipse.paho.android.service.MqttService" />
-        
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

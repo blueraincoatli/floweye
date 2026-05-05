@@ -4,21 +4,22 @@ import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
 import org.eclipse.paho.client.mqttv3.*
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 
 /**
  * MQTT客户端管理类
- * 
+ *
  * 功能：
- * 1. 连接到MQTT Broker
+ * 1. 连接到MQTT Broker（支持自动重连）
  * 2. 发布视线状态数据
- * 3. 订阅其他设备的状态（如需要）
- * 4. 处理连接状态管理
+ * 3. 订阅协调器决策话题
+ * 4. 重连后自动重新订阅
  */
 class MqttClient(
     private val context: Context,
     private val deviceId: String
 ) {
-    
+
     companion object {
         private const val TAG = "MqttClient"
         private const val PREFS_NAME = "gaze_mqtt_prefs"
@@ -40,34 +41,33 @@ class MqttClient(
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    // MQTT组件
     private var pahoClient: org.eclipse.paho.client.mqttv3.MqttClient? = null
     private val gson = Gson()
-    
+
     // 连接参数
     private var brokerHost = prefs.getString(PREF_KEY_BROKER_HOST, DEFAULT_BROKER_HOST) ?: DEFAULT_BROKER_HOST
     private var brokerPort = prefs.getInt(PREF_KEY_BROKER_PORT, DEFAULT_BROKER_PORT)
+    @Volatile
     private var isConnected = false
-    
+    private var intentionalDisconnect = false
+
     // 监听器
     var connectionListener: ConnectionListener? = null
-    
-    /**
-     * 连接状态监听器
-     */
+
     interface ConnectionListener {
         fun onConnected()
         fun onDisconnected()
         fun onConnectionFailed(error: String)
         fun onMessageReceived(topic: String, message: String)
     }
-    
+
     /**
      * 连接MQTT Broker
      */
     fun connect(host: String? = null, port: Int? = null) {
         brokerHost = host ?: prefs.getString(PREF_KEY_BROKER_HOST, DEFAULT_BROKER_HOST) ?: DEFAULT_BROKER_HOST
         brokerPort = port ?: prefs.getInt(PREF_KEY_BROKER_PORT, DEFAULT_BROKER_PORT)
+        intentionalDisconnect = false
 
         Thread {
             try {
@@ -75,7 +75,9 @@ class MqttClient(
                 val clientId = "GazeApp_$deviceId"
                 Log.i(TAG, "连接MQTT Broker: $serverUri, ClientId: $clientId")
 
-                pahoClient = org.eclipse.paho.client.mqttv3.MqttClient(serverUri, clientId)
+                pahoClient = org.eclipse.paho.client.mqttv3.MqttClient(
+                    serverUri, clientId, MemoryPersistence()
+                )
 
                 val options = MqttConnectOptions().apply {
                     isAutomaticReconnect = true
@@ -91,20 +93,25 @@ class MqttClient(
                     setWill(willTopic, willMessage.toByteArray(), QOS, true)
                 }
 
-                pahoClient?.connect(options)
-                isConnected = true
-                Log.i(TAG, "MQTT连接成功: $serverUri")
+                // 使用 MqttCallbackExtended，重连后自动重新订阅
+                pahoClient?.setCallback(object : MqttCallbackExtended {
+                    override fun connectComplete(reconnect: Boolean, serverURI: String?) {
+                        isConnected = true
+                        Log.i(TAG, "MQTT连接成功 (reconnect=%b): %s".format(reconnect, serverURI))
+                        publishDeviceStatus("online")
+                        subscribeToCoordinationTopic()
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            connectionListener?.onConnected()
+                        }
+                    }
 
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    connectionListener?.onConnected()
-                }
-
-                pahoClient?.setCallback(object : MqttCallback {
                     override fun connectionLost(cause: Throwable?) {
                         isConnected = false
                         Log.w(TAG, "MQTT连接丢失", cause)
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            connectionListener?.onDisconnected()
+                        if (!intentionalDisconnect) {
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                connectionListener?.onDisconnected()
+                            }
                         }
                     }
 
@@ -119,8 +126,8 @@ class MqttClient(
                     override fun deliveryComplete(token: IMqttDeliveryToken) {}
                 })
 
-                publishDeviceStatus("online")
-                subscribeToCoordinationTopic()
+                pahoClient?.connect(options)
+                // 首次连接成功时 connectComplete 也会被调用，不需要重复处理
 
             } catch (e: Exception) {
                 Log.e(TAG, "MQTT连接失败", e)
@@ -131,7 +138,7 @@ class MqttClient(
             }
         }.start()
     }
-    
+
     /**
      * 发布视线状态数据
      */
@@ -144,12 +151,11 @@ class MqttClient(
             val topic = String.format(GAZE_STATUS_TOPIC, deviceId)
             val message = gson.toJson(gazeData)
             pahoClient?.publish(topic, message.toByteArray(), QOS, false)
-            Log.d(TAG, "视线状态发布成功: $topic")
         } catch (e: Exception) {
             Log.e(TAG, "视线状态发布失败", e)
         }
     }
-    
+
     /**
      * 发布设备状态
      */
@@ -169,7 +175,7 @@ class MqttClient(
             Log.e(TAG, "发布设备状态异常", e)
         }
     }
-    
+
     /**
      * 订阅协调话题
      */
@@ -181,11 +187,12 @@ class MqttClient(
             Log.e(TAG, "订阅协调话题失败", e)
         }
     }
-    
+
     /**
      * 断开连接
      */
     fun disconnect() {
+        intentionalDisconnect = true
         try {
             if (isConnected) {
                 publishDeviceStatus("offline")
@@ -197,15 +204,9 @@ class MqttClient(
             Log.e(TAG, "断开MQTT连接异常", e)
         }
     }
-    
-    /**
-     * 检查连接状态
-     */
+
     fun isConnected(): Boolean = isConnected
-    
-    /**
-     * 获取连接信息
-     */
+
     fun getConnectionInfo(): Map<String, Any> {
         return mapOf(
             "brokerHost" to brokerHost,
@@ -215,10 +216,7 @@ class MqttClient(
             "clientId" to "GazeApp_$deviceId"
         )
     }
-    
-    /**
-     * 更新MQTT Broker地址
-     */
+
     fun updateBrokerAddress(host: String, port: Int) {
         if (host != brokerHost || port != brokerPort) {
             Log.i(TAG, "更新MQTT Broker地址: $host:$port")
@@ -230,10 +228,7 @@ class MqttClient(
             connect(host, port)
         }
     }
-    
-    /**
-     * 发送测试消息
-     */
+
     fun sendTestMessage() {
         val testData = mapOf(
             "deviceId" to deviceId,

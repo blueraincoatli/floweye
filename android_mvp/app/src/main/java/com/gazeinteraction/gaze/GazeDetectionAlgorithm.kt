@@ -63,7 +63,9 @@ class GazeDetectionAlgorithm(private val context: Context) {
     private val gazeHistory = ArrayDeque<Boolean>(HISTORY_SIZE)
     private var lastLookingAtScreen = false
     private var consecutiveFrames = 0
+    private var notLookingFrames = 0
     private val requiredConsecutiveFrames = 2
+    private val requiredNotLookingFrames = 10  // ~300ms @ 30fps，离开注视也需要防抖
 
     interface GazeListener {
         fun onGazeAtScreen(confidence: Float)
@@ -198,6 +200,7 @@ class GazeDetectionAlgorithm(private val context: Context) {
         val looking = lookCount > HISTORY_SIZE / 2
 
         if (looking) {
+            notLookingFrames = 0
             if (lastLookingAtScreen) {
                 consecutiveFrames++
                 // 只在首次达到连续阈值时触发一次，避免每帧重复回调
@@ -209,21 +212,25 @@ class GazeDetectionAlgorithm(private val context: Context) {
                 consecutiveFrames = 1
             }
         } else {
+            consecutiveFrames = 0
             if (lastLookingAtScreen) {
-                lastLookingAtScreen = false
-                consecutiveFrames = 0
-                gazeListener?.onGazeAway()
+                notLookingFrames++
+                // 离开注视也需要防抖，避免短暂误报导致计时重置
+                if (notLookingFrames >= requiredNotLookingFrames) {
+                    lastLookingAtScreen = false
+                    notLookingFrames = 0
+                    gazeListener?.onGazeAway()
+                }
+            } else {
+                notLookingFrames = 0
             }
         }
     }
 
     private fun handleNoFaceDetected() {
-        gazeHistory.clear()
-        if (lastLookingAtScreen) {
-            lastLookingAtScreen = false
-            consecutiveFrames = 0
-            gazeListener?.onGazeAway()
-        }
+        // 走正常防抖流程，避免短时间丢帧直接触发 onGazeAway
+        // MediaPipe 因光线/角度/遮挡丢帧很常见，不应立即重置注视计时
+        handleResult(false, 0.0f)
     }
 
     // ==================== 辅助计算 ====================

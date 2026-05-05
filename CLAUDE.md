@@ -4,185 +4,160 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-这是一个为失能患者开发的多设备协同视线交互系统，通过检测用户的视线方向，让患者能够通过眼神进行简单的"是/否"选择。系统采用分布式架构，多设备协同工作，提高交互的可靠性和准确性。
+Floweye - 失能患者视线交互通信系统。通过检测患者视线方向，实现"是/否"选择和多层菜单浏览，帮助失能患者表达需求（疼痛、护理、吃喝、环境、社交、紧急呼叫等）。
 
 **技术栈**: Kotlin + MediaPipe + MQTT + Python
-**目标设备**: 华为手机（无GMS）、iPhone、协调器
+**目标设备**: 华为手机（无GMS）、iPhone、PC/Mac（协调器）
+
+### 交互模式
+- **单设备模式 (SINGLE_SWITCH)**: 一台设备，视线唤醒 + 扫描选择，适合认知能力较低的患者
+- **双设备模式 (DUAL_SWITCH)**: 两台设备分别显示"是"/"否"，视线确认选择，适合认知能力较高的患者
 
 ## 常用开发命令
 
-### 构建和部署
-
-#### Android应用构建
+### Android 应用构建
 ```bash
-# 进入Android项目目录
 cd android_mvp
 
-# 下载MediaPipe模型文件
+# 下载 MediaPipe 模型（首次）
 curl -L -o "app/src/main/assets/face_landmarker_v2_with_blendshapes.task" \
   https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker_v2_with_blendshapes/float16/1/face_landmarker_v2_with_blendshapes.task
 
-# 使用Android Studio构建（推荐）
-# 或者使用命令行:
+# 构建
 ./gradlew assembleDebug
-
-# 生成的APK路径
-# app/build/outputs/apk/debug/app-debug.apk
+# 输出: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-#### 中央协调器启动
+### 协调器启动
 ```bash
-# 进入协调器目录
 cd coordinator_app
-
-# 安装Python依赖
 pip install -r requirements.txt
 
-# 启动协调器（默认连接本机1883端口）
-python simple_coordinator.py
+# 基线协调器（简单是/否融合）
+python simple_coordinator.py [broker_host] [broker_port]
 
-# 指定MQTT Broker地址
-python simple_coordinator.py 192.168.1.100 1883
+# 扫描协调器（菜单浏览 + TTS + 自适应）
+python scanning_coordinator.py --menu menu_config.json --patient patient_config.json [broker_host] [broker_port]
+
+# 模拟联调（无需真机）
+python simulate_scanning_flow.py
 ```
 
-#### 快速构建
+### 调试
 ```bash
-# 使用项目提供的快速构建脚本
-./quick_build.bat
-```
-
-### 调试和监控
-
-#### Android应用日志
-```bash
-# 过滤应用相关日志
+# Android 日志
 adb logcat | grep -E "(GazeInteraction|MediaPipe|MQTT)"
-```
 
-#### 协调器日志
-```bash
-# 协调器输出到文件
-python simple_coordinator.py 2>&1 | tee coordinator.log
+# 协调器测试
+python test_coordinator.py
+python test_scanning_coordinator.py
 ```
 
 ## 系统架构
 
-### 分布式设计
 ```
-📱 华为手机A (是) ──┐
-📱 华为手机B (否) ──┼─→ 🌐 MQTT Broker ──→ 💻 中央协调器 ──→ ✅ 最终决策
-📱 iPhone (是)     ──┘
+Android 设备 (是/否) ──MQTT──> Broker <──MQTT──> 扫描协调器 (PC)
+                                                 |
+                                                 +-- 菜单引擎 (2层JSON配置)
+                                                 +-- TTS 语音播报
+                                                 +-- 自适应停留时间
+                                                 +-- 紧急触发逻辑
 ```
 
-### 核心组件
+### MQTT 主题
+- `gazecontrol/device/{deviceId}/status` - 设备上下线
+- `gazecontrol/device/{deviceId}/gaze_status` - 视线状态 (looking/at_screen + confidence)
+- `gazecontrol/coordination/decision` - 协调器决策结果
+- `gazecontrol/device/{deviceId}/command` - 协调器向设备下发指令
 
-#### Android应用 (`android_mvp/`)
-- **MainActivity.kt**: 主界面，协调所有组件
-- **CameraManager.kt**: Camera2 API管理（华为设备兼容）
-- **FaceLandmarkerHelper.kt**: MediaPipe封装，使用Face Landmarker V2
-- **GazeDetectionAlgorithm.kt**: 视线检测算法
-- **MqttClient.kt**: MQTT通信客户端
+### 数据流
+1. 摄像头 -> Camera2 API -> MediaPipe Face Landmarker V2 -> 视线检测算法
+2. 视线结果 -> MQTT -> 扫描协调器
+3. 协调器: 菜单引擎 + 状态机 (IDLE/SCAN/CONFIRM/ALERT/WAITING) -> 决策
+4. 决策 -> MQTT -> 设备UI更新 + TTS播报
 
-#### 中央协调器 (`coordinator_app/`)
-- **simple_coordinator.py**: 主协调器，接收多设备数据并做出决策
-- **requirements.txt**: Python依赖（paho-mqtt等）
+## 核心文件
 
-### 数据流设计
-1. **视觉处理**: 摄像头 → Camera2 API → MediaPipe → 视线检测算法
-2. **状态发布**: 本地结果 → MQTT → 中央协调器
-3. **决策制定**: 多设备输入 → 置信度分析 → 最终选择
+### Android (`android_mvp/app/src/main/java/com/gazeinteraction/`)
+| 文件 | 职责 |
+|------|------|
+| `MainActivity.kt` | 主界面，多状态UI引擎 (IDLE/TRANSITION/SCAN/CONFIRM/FEEDBACK)，进度条，呼吸动画 |
+| `camera/CameraManager.kt` | Camera2 API，华为兼容，RenderScript YUV->ARGB |
+| `mediapipe/FaceLandmarkerHelper.kt` | MediaPipe Face Landmarker V2 封装，CPU Delegate |
+| `gaze/GazeDetectionAlgorithm.kt` | 视线检测：瞳孔居中 + 眼睛睁开度 + 时间平滑 + 校准 |
+| `mqtt/MqttClient.kt` | MQTT 通信，自动重连，状态发布 |
+| `debug/FaceMeshOverlayView.kt` | 调试用面部网格叠加层 |
 
-## 技术栈详情
+### 协调器 (`coordinator_app/`)
+| 文件 | 职责 |
+|------|------|
+| `scanning_coordinator.py` | 扫描协调器主程序：状态机、菜单引擎、TTS、自适应、紧急触发 |
+| `simple_coordinator.py` | 基线协调器：简单多设备是/否融合 |
+| `menu_config.json` | 菜单配置：6大类（不舒服/护理/吃喝/环境/社交/紧急），2层结构 |
+| `patient_config.json` | 患者配置：停留时间、TTS参数、自适应参数、交互模式 |
+| `simulate_scanning_flow.py` | 模拟脚本：验证 single_select/dual_confirm/dual_skip/dual_emergency |
+| `test_scanning_coordinator.py` | 自动化测试（当前 8 passed） |
+| `gen.py` | 配置文件生成工具 |
 
-### Android应用
-- **语言**: Kotlin
-- **Android版本**: API 28+ (Android 9.0+)
-- **摄像头**: Camera2 API（兼容华为无GMS设备）
-- **视觉处理**: MediaPipe Tasks Vision (v0.10.8)
-- **推理引擎**: CPU Delegate（确保华为设备稳定性）
-- **通信**: Eclipse Paho MQTT (v1.2.5)
+### Android UI 资源
+- `activity_main.xml` - 主布局（单按钮占满中央、进度条、状态栏）
+- `layout-land/` - 横屏适配
+- `debug_panel.xml` - 调试面板
+- `drawable/btn_*` - 按钮状态背景（注视/普通，是/否）
+- `drawable/progress_bar_gaze.xml` - 注视进度条样式
 
-### 中央协调器
-- **语言**: Python 3.7+
-- **MQTT**: paho-mqtt (v1.6.1)
-- **跨平台**: Windows/macOS/Linux
+## 关键算法参数
+
+### 视线检测 (`GazeDetectionAlgorithm.kt`)
+```kotlin
+CONFIDENCE_THRESHOLD = 0.55f    // 最低置信度
+PUPIL_CENTER_THRESHOLD = 0.08   // 瞳孔居中判定
+EYE_OPEN_MIN = 0.15             // 眼睛最低睁开度
+HISTORY_SIZE = 8                // 时间平滑窗口
+LEFT_PUPIL = 468                // 左虹膜中心关键点
+RIGHT_PUPIL = 473               // 右虹膜中心关键点
+```
+
+### 协调器状态机 (`scanning_coordinator.py`)
+```
+IDLE -> SCAN -> CONFIRM -> ALERT (或回到 SCAN/IDLE)
+                 |
+                 +-> WAITING (双设备等待第二确认)
+```
+
+### 患者配置参数 (`patient_config.json`)
+- 单设备: wake_gaze=3s, select_gaze=1.5s, dwell=3-7s
+- 双设备: select_gaze=1.5s, skip_gaze=0.5s, hesitation=0.3s
+- TTS: rate=150, 夜间自动降音量(22:00-06:00)
+- 自适应: 根据近5次选择历史调整停留时间(步长0.5s)
 
 ## 开发注意事项
 
-### 华为设备特殊配置
-- 使用Camera2 API替代CameraX避免兼容性问题
-- 强制使用CPU Delegate确保稳定性
-- 分辨率640x480，帧率自适应设备支持范围（目标30fps）
-- 使用RenderScript直接YUV->ARGB转换，避免JPEG编解码开销
-- 关闭未使用的Blendshapes和变换矩阵输出以节省CPU
-- OIS仅在设备支持时启用
-- 严格的内存管理避免泄漏（使用applicationContext）
+### 华为设备兼容
+- Camera2 API 替代 CameraX
+- CPU Delegate（不用 GPU/NPU）
+- 分辨率 640x480，目标 30fps
+- RenderScript YUV->ARGB 直接转换
+- 关闭 Blendshapes 和变换矩阵输出
+- 使用 applicationContext 防内存泄漏
 
-### 网络配置
-- 所有设备需在同一局域网
-- MQTT Broker默认端口1883
-- 主题设计：
-  - `gazecontrol/device/{deviceId}/status` (设备状态)
-  - `gazecontrol/device/{deviceId}/gaze_status` (视线状态)
-  - `gazecontrol/coordination/decision` (协调决策)
+### MQTT 通信
+- 所有设备同一局域网，Broker 默认端口 1883
+- Android 端发布节流：最小间隔 500ms
+- 协调器设备有效窗口 30s，离线超时 60s
+- 决策防抖：连续 2 次一致确认才生效
 
-### 算法参数
-```kotlin
-// GazeDetectionAlgorithm.kt 关键参数
-private const val CONFIDENCE_THRESHOLD = 0.55f   // 最低置信度阈值
-private const val PUPIL_POSITION_TO_ANGLE_SCALE = 35.0  // 瞳孔比例->角度缩放
-private const val HISTORY_SIZE = 8                // 时间平滑窗口大小
-private val requiredConsecutiveFrames = 2         // 连续确认帧数
+### 代码规范
+- Android 端不使用 GMS 服务
+- 不在代码中使用 unicode 编码的 emoji 字符
+- 协调器配置通过 JSON 文件管理，不硬编码
+- TTS 异步解耦，不阻塞状态机
 
-// 虹膜关键点索引
-private const val LEFT_PUPIL = 468
-private const val RIGHT_PUPIL = 473
+## 当前进度
 
-// 校准缓冲带
-val margin = span * 0.15  // 两基准间 15% 缓冲带
-```
-
-## 故障排除
-
-### 常见问题
-1. **摄像头初始化失败**: 检查权限和Camera2 API支持
-2. **MediaPipe初始化失败**: 确认模型文件在assets目录
-3. **MQTT连接失败**: 检查网络连接和Broker配置
-4. **视线检测不准确**: 调整用户距离(40-60cm)和光照条件
-
-### 性能监控
-```bash
-# 监控Android应用性能
-adb shell top | grep com.gazeinteraction
-
-# 监控网络流量
-adb shell nethogs
-```
-
-## 关键文件说明
-
-### Android核心文件
-- **MainActivity.kt**: 应用主入口，管理组件生命周期
-- **GazeDetectionAlgorithm.kt**: 核心视线检测逻辑
-- **MqttClient.kt**: 网络通信封装，支持自动重连
-- **FaceLandmarkerHelper.kt**: MediaPipe集成，处理人脸关键点
-
-### 协调器文件
-- **simple_coordinator.py**: 多设备数据融合和决策逻辑
-- **test_coordinator.py**: 协调器功能测试脚本
-
-## 扩展开发建议
-
-### 短期优化
-- 针对具体华为设备型号优化性能
-- 基于测试反馈调整UI设计
-- 优化视线检测算法参数
-- 开发iOS版本应用
-
-### 中期扩展
-- 扩展多选项支持（3-5个选项）
-- 添加语音播报功能
-- 集成历史数据分析
-- 支持云端协调器部署
+详细进度见 `todo.md`。核心状态：
+- **已完成**: Android MVP、视线检测、MQTT通信、双协调器、模拟联调、自动化测试
+- **进行中**: Android 真机对接 scanning_coordinator、华为设备实测
+- **待开始**: iOS 版本、3+设备直接选择、护理端 Web 界面、TLS、临床测试
 
 **免责声明**: 本项目为研究和概念验证目的开发，请在实际医疗环境中使用前进行充分测试和验证。

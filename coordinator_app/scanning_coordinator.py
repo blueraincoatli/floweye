@@ -4,6 +4,7 @@ Scanning Coordinator - Python version for gaze-controlled patient communication 
 """
 
 import argparse
+import concurrent.futures
 import json
 import logging
 import os
@@ -38,6 +39,32 @@ try:
 except ImportError:
     _PYTTSX3_AVAILABLE = False
     pyttsx3 = None  # type: ignore
+
+# Windows SAPI via PowerShell - more reliable than pyttsx3.runAndWait()
+import subprocess
+import sys
+
+def _sapi_speak(text: str, rate: int = 150, volume: int = 100) -> bool:
+    """Speak using Windows SAPI via PowerShell. Returns True on success."""
+    if sys.platform != "win32":
+        return False
+    # Escape single quotes in text
+    escaped = text.replace("'", "''")
+    ps_cmd = (
+        f"Add-Type -AssemblyName System.Speech; "
+        f"$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+        f"$synth.Rate = {rate}; "
+        f"$synth.Volume = {volume}; "
+        f"$synth.Speak('{escaped}')"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell", "-Command", ps_cmd],
+            capture_output=True, timeout=30
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 logging.basicConfig(
     level=logging.INFO,
@@ -248,29 +275,34 @@ class MenuEngine:
 
 
 class TTSEngine:
+    """TTS engine using pyttsx3. All speak calls run in the caller's thread
+    to avoid runAndWait() deadlock issues on Windows SAPI5."""
+
     def __init__(self, config_loader: ConfigLoader):
         self._config = config_loader
         self._engine: Any = None
         self._lock = threading.Lock()
-        self._queue: "queue.Queue[Optional[str]]" = queue.Queue()
         self._stopped = threading.Event()
         if _PYTTSX3_AVAILABLE and pyttsx3 is not None:
             try:
                 self._engine = pyttsx3.init()
                 self._engine.setProperty("rate", self._config.get_param("tts.rate", 150))
                 self._engine.setProperty("volume", self._config.get_param("tts.volume", 1.0))
-                # 优先使用中文语音
-                for v in self._engine.getProperty("voices"):
+                voices = self._engine.getProperty("voices")
+                logger.info("[TTS] Available voices: %s", [v.id for v in voices])
+                for v in voices:
                     if "CN" in v.id or "ZH" in v.id or "Chinese" in v.name:
                         self._engine.setProperty("voice", v.id)
+                        logger.info("[TTS] Selected Chinese voice: %s", v.id)
                         break
+                else:
+                    if voices:
+                        logger.warning("[TTS] No Chinese voice found, using default: %s", voices[0].id)
             except Exception as e:
                 logger.warning("TTS init failed: %s", e)
                 self._engine = None
         else:
             logger.warning("pyttsx3 not installed, TTS unavailable")
-        self._worker = threading.Thread(target=self._run, name="tts-worker", daemon=True)
-        self._worker.start()
 
     @staticmethod
     def _is_night_mode() -> bool:
@@ -283,43 +315,34 @@ class TTSEngine:
         return self._config.get_param("tts.volume", 0.8)
 
     def speak(self, text: str) -> None:
-        logger.info("[TTS] %s", text)
-        if self._stopped.is_set() or self._engine is None:
+        """Speak text synchronously. Must be called from a background thread."""
+        if self._stopped.is_set():
             return
-        self._queue.put(text)
-
-    def _run(self) -> None:
-        while not self._stopped.is_set():
-            try:
-                text = self._queue.get(timeout=0.1)
-            except queue.Empty:
-                continue
-
-            if text is None:
-                self._queue.task_done()
-                break
-
-            with self._lock:
-                try:
-                    self._engine.setProperty("volume", self._get_volume())
-                    # 收集队列中所有待播文本，一次runAndWait播完
-                    texts = [text]
-                    while True:
+        rate = self._config.get_param("tts.rate", 150)
+        # pyttsx3 rate range is -10 to 10, convert from words/min
+        sapi_rate = max(-10, min(10, (rate - 150) // 15))
+        volume = int(self._get_volume() * 100)
+        logger.info("[TTS] Speaking: %s", text)
+        ok = _sapi_speak(text, sapi_rate, volume)
+        if ok:
+            logger.info("[TTS] Done: %s", text)
+        else:
+            logger.warning("[TTS] PowerShell SAPI failed, falling back to pyttsx3")
+            # Fallback to pyttsx3
+            if self._engine is not None:
+                with self._lock:
+                    try:
+                        self._engine.say(text)
+                        self._engine.runAndWait()
+                    except Exception:
                         try:
-                            extra = self._queue.get_nowait()
-                            if extra is None:
-                                self._queue.task_done()
-                                break
-                            texts.append(extra)
-                            self._queue.task_done()
-                        except queue.Empty:
-                            break
-                    for t in texts:
-                        self._engine.say(t)
-                    self._engine.runAndWait()
-                except Exception as e:
-                    logger.warning("TTS speak failed: %s", e)
-            self._queue.task_done()
+                            self._engine.stop()
+                        except Exception:
+                            pass
+
+    @property
+    def is_available(self) -> bool:
+        return self._engine is not None and not self._stopped.is_set()
 
     def stop(self) -> None:
         self._stopped.set()
@@ -329,8 +352,6 @@ class TTSEngine:
                     self._engine.stop()
                 except Exception as e:
                     logger.warning("TTS stop failed: %s", e)
-        self._queue.put(None)
-        self._worker.join(timeout=1.0)
 
 
 class GazeInterpreter:
@@ -419,7 +440,7 @@ class GazeInterpreter:
                 if role == "yes" and current_state == State.SCAN and hesitation_sec <= duration < select_sec:
                     if not self._device_hesitate_latched.get(device_id, False):
                         self._device_hesitate_latched[device_id] = True
-                        return self._emit_once(device_id, "hesitate")
+                        return "hesitate", None
 
                 if role == "no" and duration >= skip_sec:
                     if current_state == State.SCAN:
@@ -449,10 +470,8 @@ class DeviceManager:
                 self._devices[device_id] = {}
             self._devices[device_id].update({
                 "role": data.get("role", "unknown"),
-                "isLooking": data.get("lookingAtScreen", False),
-                "confidence": data.get("confidence", 0.0),
+                "gazeStatus": data.get("lookingAtScreen", False),
                 "lastUpdate": time.time(),
-                "calibrated": data.get("calibrated", False),
             })
 
     def update_status(self, device_id: str, status: str) -> None:
@@ -524,6 +543,12 @@ class ScanningCoordinator:
 
         self._response_times: deque = deque(maxlen=5)
         self._current_dwell = float(self.config.get_param("single_device.dwell_seconds", 5.0))
+
+        # Scan phase: "announce" = TTS播报中(只显示选项文字), "select" = 等待用户选择(显示是/否)
+        self._scan_phase = "select"
+        self._announce_start = 0.0
+        self._announce_duration = 0.0
+        self._current_announce_option: Optional[dict] = None
 
         self.topics = {
             "gaze_status": "gazecontrol/device/+/gaze_status",
@@ -637,7 +662,13 @@ class ScanningCoordinator:
             current_state=self.state,
             current_option=option,
         )
-        if action:
+        logger.debug("GAZE %s role=%s looking=%s conf=%.2f state=%s scan_phase=%s action=%s",
+                     device_id[:12], role, is_looking, confidence,
+                     self.state.name if hasattr(self.state, 'name') else self.state,
+                     self._scan_phase,
+                     action)
+        # 播报阶段不处理任何注视动作，避免误触发
+        if action and self._scan_phase != "announce":
             self._handle_action(action, param)
 
     def _handle_device_status(self, data: dict) -> None:
@@ -645,6 +676,26 @@ class ScanningCoordinator:
         status = data.get("status", "unknown")
         self.device_mgr.update_status(device_id, status)
         logger.info("[INFO] Device %s: %s", device_id[:12], status)
+        # 设备重连时，同步当前协调器状态到该设备
+        if status == "online":
+            self._sync_state_to_device()
+
+    def _sync_state_to_device(self) -> None:
+        """设备重连时，将当前协调器状态同步到所有设备"""
+        try:
+            if self.state == State.IDLE:
+                self._publish_idle()
+            elif self.state == State.SCAN:
+                option = self.menu_engine.get_current_option()
+                if option:
+                    if self._scan_phase == "announce":
+                        self._publish_announce(option)
+                    else:
+                        self._publish_scan_progress(option)
+            elif self.state == State.CONFIRM and self._confirm_option:
+                self.publish_decision("confirm", self._confirm_option)
+        except Exception as e:
+            logger.warning("[SYNC] State sync failed: %s", e)
 
     def publish_decision(self, decision_type: str, option: Optional[dict], urgency: str = "normal") -> None:
         if self.mqtt_client is None or not self.mqtt_client.is_connected():
@@ -694,13 +745,14 @@ class ScanningCoordinator:
             if selected is None:
                 return
             if not is_leaf:
-                # Entered submenu, speak first option
+                # Entered submenu, announce first option
+                self.gaze.reset()  # 清除 latch，允许子菜单中的新选择
                 self._option_started = time.time()
                 self._dwell_start = time.time()
                 self._round_count = 0
                 first = self.menu_engine.get_current_option()
                 if first:
-                    self.tts.speak(first.get("tts_prompt", first.get("label", "")))
+                    self._start_announce(first)
                 return
             if option.get("skip_confirm"):
                 self._execute_option(option)
@@ -725,8 +777,8 @@ class ScanningCoordinator:
 
     def _enter_alert(self) -> None:
         self.state = State.ALERT
-        self.tts.speak("\u7d27\u6025\u547c\u53eb")
         self.publish_decision("emergency", None, urgency="critical")
+        threading.Thread(target=lambda: self.tts.speak("紧急呼叫"), daemon=True).start()
         # After alert, could stay in ALERT or return to IDLE after a delay
         # For simplicity, return to IDLE after TTS finishes
         self._reset_to_idle()
@@ -798,29 +850,41 @@ class ScanningCoordinator:
     def _enter_scan(self) -> None:
         self.state = State.SCAN
         self.menu_engine.reset()
+        self.gaze.reset()
         self._round_count = 0
         self._dwell_start = time.time()
         self._option_started = time.time()
-        # \u8fc7\u6e21\uff1a\u6e05\u7a7a\u5c4f\u5e55 + TTS\u63d0\u793a
+        self._scan_phase = "announce"  # 进入播报阶段，阻止 gaze 事件
+        self._scan_generation = getattr(self, '_scan_generation', 0) + 1
+        # 过渡：清空屏幕
         self._publish_transition()
-        self.tts.speak("\u5373\u5c06\u64ad\u653e\u9009\u9879")
-        time.sleep(1)
-        # \u5f00\u59cb\u64ad\u62a5\u7b2c\u4e00\u4e2a\u9009\u9879
+        # 在后台线程中播报过渡语 + 第一个选项
+        threading.Thread(target=self._scan_intro, daemon=True).start()
+
+    def _scan_intro(self) -> None:
+        """后台线程：播报过渡语，然后播报第一个选项"""
+        # 用一个递增的 generation 标记防止旧线程干扰新状态
+        gen = self._scan_generation
+        self.tts.speak("即将播报选项")
+        # 播报完后如果已经不在 SCAN 或 generation 已变，说明被中断了
+        if self.state != State.SCAN or gen != self._scan_generation:
+            logger.info("[SCAN_INTRO] Aborted after intro TTS (state=%s, gen_changed=%s)",
+                        self.state.name if hasattr(self.state, 'name') else self.state,
+                        gen != self._scan_generation)
+            return
         option = self.menu_engine.get_current_option()
         if option:
-            self.tts.speak(option.get("tts_prompt", option.get("label", "")))
-            self._publish_scan_progress(option)
+            self._announce_and_select(option)
         else:
-            self.tts.speak("\u8bf7\u9009\u62e9")
             self._publish_scan_progress(None)
 
     def _enter_confirm(self, option: dict) -> None:
         self.state = State.CONFIRM
         self._confirm_option = option
         self._dwell_start = time.time()
-        prompt = option.get("tts_prompt", option.get("label", ""))
-        self.tts.speak("\u786e\u8ba4" + prompt)
+        self.gaze.reset()  # 清除 latch，允许 CONFIRM 阶段的新选择
         self.publish_decision("confirm", option)
+        threading.Thread(target=lambda: self.tts.speak("确认" + option.get("tts_prompt", option.get("label", ""))), daemon=True).start()
 
     def _execute_selection(self) -> None:
         if self._confirm_option:
@@ -831,7 +895,6 @@ class ScanningCoordinator:
         urgency = option.get("urgency", "normal")
         self.publish_decision("selection", option, urgency=urgency)
         self._publish_executed(option)
-        self.tts.speak("\u5df2\u901a\u77e5")
         self.state = State.WAITING
         self._dwell_start = time.time()
         # Record response time for adaptive dwell
@@ -839,29 +902,88 @@ class ScanningCoordinator:
         self._update_dwell(response_time)
 
     def _skip_current(self) -> None:
+        logger.info("[SKIP] Skipped current option by 'no' device gaze")
+        self.publish_decision("skip_feedback", self.menu_engine.get_current_option())
         option = self.menu_engine.next_option()
         self._option_started = time.time()
         self._dwell_start = time.time()
         if option:
-            self.tts.speak(option.get("tts_prompt", option.get("label", "")))
-            self._publish_scan_progress(option)
+            self._start_announce(option)
+        else:
+            self._publish_scan_progress(None)
 
     def _cancel_confirm(self) -> None:
         self._confirm_option = None
         self.state = State.SCAN
         self._dwell_start = time.time()
+        self.gaze.reset()
         option = self.menu_engine.get_current_option()
         if option:
-            self.tts.speak(option.get("tts_prompt", option.get("label", "")))
-            self._publish_scan_progress(option)
+            self._start_announce(option)
+        else:
+            self._publish_scan_progress(None)
 
     def _reset_to_idle(self) -> None:
+        old_state = self.state
         self.state = State.IDLE
         self.menu_engine.reset()
         self.gaze.reset()
         self._confirm_option = None
         self._round_count = 0
+        self._scan_phase = "select"
+        self._current_announce_option = None
         self._publish_idle()
+        logger.info("[RESET] Returned to IDLE from %s", old_state.name if hasattr(old_state, 'name') else old_state)
+
+    def _start_announce(self, option: dict) -> None:
+        """在后台线程中播报选项：发 announce -> TTS 播报 -> 发 scan_progress"""
+        self._scan_phase = "announce"  # 立即标记为播报阶段，阻止 gaze 事件
+        threading.Thread(target=self._announce_and_select, args=(option,), daemon=True).start()
+
+    def _announce_and_select(self, option: dict) -> None:
+        """同步播报：announce(只显示文字) -> TTS 播报 -> scan_progress(显示是/否按钮)"""
+        if self.state != State.SCAN:
+            return
+
+        gen = self._scan_generation
+        self._scan_phase = "announce"
+        self._current_announce_option = option
+        self._announce_start = time.time()
+        self._publish_announce(option)
+
+        # TTS 播报
+        text = option.get("tts_prompt", option.get("label", ""))
+        self.tts.speak(text)
+
+        # 播报完毕，检查是否被中断（状态变了或 generation 变了）
+        if self.state != State.SCAN or gen != self._scan_generation:
+            logger.info("[ANNOUNCE] Aborted after TTS for '%s'", option.get("label", ""))
+            return
+
+        if self._scan_phase == "announce":
+            self._scan_phase = "select"
+            now = time.time()
+            self._dwell_start = now
+            self._option_started = now
+            self._publish_scan_progress(option)
+            logger.info("[SELECT] %s", option.get("label", ""))
+
+    def _publish_announce(self, option: dict) -> None:
+        """发布播报阶段消息：手机端只显示选项文字，不显示是/否按钮"""
+        if self.mqtt_client is None or not self.mqtt_client.is_connected():
+            return
+        payload = {
+            "type": "announce",
+            "timestamp": int(time.time() * 1000),
+            "activeDevices": self.device_mgr.get_online_count(),
+            "optionId": option.get("id"),
+            "optionLabel": option.get("label"),
+            "ttsPrompt": option.get("tts_prompt", ""),
+        }
+        try:
+            self.mqtt_client.publish(self.topics["coordination"], json.dumps(payload, ensure_ascii=False), qos=1)
+        except Exception as e:
+            logger.error("Publish announce failed: %s", e)
 
     # --- Scan Loop ---
 
@@ -875,6 +997,12 @@ class ScanningCoordinator:
             now = time.time()
 
             if state == State.SCAN:
+                # ANNOUNCE 阶段由 _announce_and_switch 后台线程处理
+                # 这里只处理 SELECT 阶段的 dwell 计时
+                if self._scan_phase == "announce":
+                    continue
+
+                # SELECT 阶段：dwell 计时，等待用户选择
                 dwell = self._get_current_dwell()
                 if now - self._dwell_start >= dwell:
                     # Dwell expired, advance
@@ -899,8 +1027,7 @@ class ScanningCoordinator:
                             self._reset_to_idle()
                             continue
 
-                    self.tts.speak(option.get("tts_prompt", option.get("label", "")))
-                    self._publish_scan_progress(option)
+                    self._start_announce(option)
 
             elif state == State.CONFIRM:
                 if now - self._dwell_start >= self._get_confirm_timeout():
@@ -916,7 +1043,7 @@ class ScanningCoordinator:
                     pass
 
     def _get_confirm_timeout(self) -> float:
-        return 5.0
+        return 10.0
 
     def _get_wait_timeout(self) -> float:
         return 10.0
