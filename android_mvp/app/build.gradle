@@ -78,6 +78,9 @@ dependencies {
     // 协程
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 
+    // MQTT Broker (embedded, for self-hosted mode)
+    implementation 'io.moquette:moquette-broker:0.17'
+
     // Testing
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20231013'
