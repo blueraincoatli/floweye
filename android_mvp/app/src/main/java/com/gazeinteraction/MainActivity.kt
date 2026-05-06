@@ -336,7 +336,6 @@ class MainActivity : AppCompatActivity(),
                     mainButton.visibility = View.VISIBLE
                     mainButton.text = label
                     gazeHaloView.visibility = View.VISIBLE
-                    gazeHaloView.labelText = label
                     gazeHaloView.haloColor = currentTheme.haloColorFor(deviceRole)
                     gazeHaloView.enterScanMode()
                     arcProgressView.visibility = View.VISIBLE
@@ -354,7 +353,6 @@ class MainActivity : AppCompatActivity(),
                 mainButton.visibility = View.VISIBLE
                 mainButton.text = label
                 gazeHaloView.visibility = View.VISIBLE
-                gazeHaloView.labelText = label
                 gazeHaloView.haloColor = currentTheme.haloColorFor(deviceRole)
                 gazeHaloView.enterConfirmMode()
                 arcProgressView.visibility = View.VISIBLE
@@ -566,9 +564,11 @@ class MainActivity : AppCompatActivity(),
                     }
                 }
                 setConnectionDotStatus("connecting")
+                Toast.makeText(this@MainActivity, "正在连接MQTT...", Toast.LENGTH_SHORT).show()
                 mqttClient.connect()
             } catch (e: Exception) {
                 Log.e(TAG, "MQTT init failed", e)
+                Toast.makeText(this@MainActivity, "MQTT初始化异常: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }

@@ -606,11 +606,11 @@ class ScanningCoordinator:
 
     def connect_mqtt(self) -> None:
         try:
-            self.mqtt_client = mqtt.Client(client_id="ScanningCoordinator")
+            self.mqtt_client = mqtt.Client(client_id="ScanningCoordinator", clean_session=True)
             self.mqtt_client.on_connect = self._on_connect
             self.mqtt_client.on_disconnect = self._on_disconnect
             self.mqtt_client.on_message = self._on_message
-            self.mqtt_client.reconnect_delay_set(min_delay=1, max_delay=30)
+            self.mqtt_client.reconnect_delay_set(min_delay=3, max_delay=15)
             logger.info("Connecting to MQTT Broker: %s:%d", self.broker_host, self.broker_port)
             self.mqtt_client.connect(self.broker_host, self.broker_port, 60)
             self.mqtt_client.loop_start()
@@ -628,7 +628,10 @@ class ScanningCoordinator:
             logger.error("[ERROR] MQTT connection failed, rc=%d", rc)
 
     def _on_disconnect(self, client, userdata, rc):
-        if rc != 0:
+        if rc == 7:
+            logger.info("[INFO] MQTT session taken over by newer connection, stopping reconnect")
+            client.loop_stop()
+        elif rc != 0:
             logger.warning("[WARN] MQTT unexpected disconnect (rc=%d), auto-reconnect enabled", rc)
         else:
             logger.info("[INFO] MQTT disconnected")

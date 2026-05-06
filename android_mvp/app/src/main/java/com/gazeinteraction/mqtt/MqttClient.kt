@@ -31,7 +31,7 @@ class MqttClient(
         private const val DEFAULT_BROKER_PORT = 1883
         private const val QOS = 1
         private const val KEEP_ALIVE_INTERVAL = 60
-        private const val CONNECTION_TIMEOUT = 30
+        private const val CONNECTION_TIMEOUT = 10
 
         // 主题配置
         private const val TOPIC_PREFIX = "gazecontrol"
@@ -69,6 +69,7 @@ class MqttClient(
         brokerPort = port ?: prefs.getInt(PREF_KEY_BROKER_PORT, DEFAULT_BROKER_PORT)
         intentionalDisconnect = false
 
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
         Thread {
             try {
                 val serverUri = "tcp://$brokerHost:$brokerPort"
@@ -132,7 +133,7 @@ class MqttClient(
             } catch (e: Exception) {
                 Log.e(TAG, "MQTT连接失败", e)
                 isConnected = false
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                handler.post {
                     connectionListener?.onConnectionFailed(e.message ?: "连接失败")
                 }
             }
