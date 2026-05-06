@@ -28,6 +28,9 @@ pytest-cache-files-*/
 Thumbs.db
 Desktop.ini
 
+# Worktrees
+.worktrees/
+
 # Build
 *.class
 *.jar
