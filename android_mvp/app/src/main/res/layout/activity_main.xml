@@ -5,151 +5,165 @@
     android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_dark"
+    android:background="@color/warm_bg"
     tools:context=".MainActivity">
 
-    <!-- 顶部状态栏 -->
+    <!-- 光圈引导层（全屏） -->
+    <com.gazeinteraction.ui.GazeHaloView
+        android:id="@+id/gazeHaloView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 顶部边缘状态条 -->
     <LinearLayout
-        android:id="@+id/statusLayout"
+        android:id="@+id/topStatusBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:padding="10dp"
-        android:gravity="center"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:gravity="center_vertical"
+        app:layout_constraintTop_toTopOf="parent">
 
-        <TextView
-            android:id="@+id/cameraStatus"
-            style="@style/StatusTextStyle"
-            android:text="@string/initializing_camera"
-            android:layout_marginEnd="10dp" />
+        <!-- 连接状态圆点 -->
+        <View
+            android:id="@+id/connectionDot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:background="@drawable/dot_status_idle" />
 
-        <TextView
-            android:id="@+id/mediapipeStatus"
-            style="@style/StatusTextStyle"
-            android:text="@string/initializing_mediapipe"
-            android:layout_marginEnd="10dp" />
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
 
-        <TextView
-            android:id="@+id/mqttStatus"
-            style="@style/StatusTextStyle"
-            android:text="@string/connecting_mqtt" />
+        <!-- 设置按钮（操作者模式下可见） -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/settingsButton"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@android:drawable/ic_menu_preferences"
+            android:scaleType="centerInside"
+            app:fabSize="mini"
+            app:backgroundTint="#33FFFFFF"
+            app:tint="@color/white" />
     </LinearLayout>
 
-    <!-- 选项名（扫描态显示，紧邻按钮上方） -->
+    <!-- 选项名文字 -->
     <TextView
         android:id="@+id/optionNameText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text=""
-        android:textSize="36sp"
-        android:textColor="@color/text_primary"
+        android:textSize="32sp"
+        android:textColor="@color/warm_text_primary"
         android:gravity="center"
-        android:layout_marginBottom="8dp"
+        android:layout_marginBottom="24dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/mainButton"
+        app:layout_constraintBottom_toTopOf="@+id/centerTextContainer"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- 底部信息区域 -->
-    <LinearLayout
-        android:id="@+id/bottomInfo"
-        android:layout_width="match_parent"
+    <!-- 中央文字区域 -->
+    <FrameLayout
+        android:id="@+id/centerTextContainer"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="10dp"
-        android:gravity="center"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
         <TextView
-            android:id="@+id/gazeStatus"
-            style="@style/StatusTextStyle"
-            android:text="@string/no_gaze_detected"
-            android:textSize="18sp"
-            android:textColor="@color/text_primary"
-            android:layout_marginBottom="4dp" />
+            android:id="@+id/mainButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="你好"
+            android:textSize="96sp"
+            android:autoSizeTextType="uniform"
+            android:autoSizeMinTextSize="48sp"
+            android:autoSizeMaxTextSize="160sp"
+            android:textStyle="bold"
+            android:textColor="@color/warm_text_primary"
+            android:gravity="center"
+            android:padding="4dp" />
+    </FrameLayout>
+
+    <!-- 圆弧进度指示器 -->
+    <com.gazeinteraction.ui.ArcProgressView
+        android:id="@+id/arcProgressView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/centerTextContainer"
+        app:layout_constraintBottom_toBottomOf="@id/centerTextContainer"
+        app:layout_constraintStart_toStartOf="@id/centerTextContainer"
+        app:layout_constraintEnd_toEndOf="@id/centerTextContainer" />
+
+    <!-- 底部状态栏 -->
+    <LinearLayout
+        android:id="@+id/bottomInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="16dp"
+        android:gravity="center"
+        app:layout_constraintBottom_toBottomOf="parent">
 
         <TextView
-            android:id="@+id/confidenceText"
-            style="@style/StatusTextStyle"
-            android:text="置信度: 0%"
+            android:id="@+id/gazeStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/no_gaze_detected"
             android:textSize="14sp"
+            android:textColor="@color/warm_text_primary"
+            android:alpha="0.6"
             android:layout_marginBottom="2dp" />
 
         <TextView
-            android:id="@+id/deviceIdText"
-            style="@style/StatusTextStyle"
-            android:text="设备ID: 未设置"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/menuOptionText"
-            style="@style/StatusTextStyle"
+            android:id="@+id/confidenceText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text=""
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:visibility="gone"
-            android:layout_marginTop="6dp" />
+            android:textSize="12sp"
+            android:textColor="@color/warm_text_primary"
+            android:alpha="0.4" />
     </LinearLayout>
 
-    <!-- 单按钮 - 占满中央区域 -->
-    <TextView
-        android:id="@+id/mainButton"
-        style="@style/LargeButtonStyle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:minHeight="200dp"
-        android:layout_margin="12dp"
-        android:text="是"
-        android:gravity="center"
-        android:background="@drawable/btn_yes_normal"
-        app:layout_constraintTop_toBottomOf="@id/optionNameText"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintVertical_bias="0.5"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- 进度条（扫描/确认态显示） -->
-    <ProgressBar
-        android:id="@+id/dwellProgressBar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="6dp"
-        android:layout_marginStart="24dp"
-        android:layout_marginEnd="24dp"
-        android:max="100"
-        android:progress="100"
-        android:visibility="gone"
-        android:progressDrawable="@drawable/progress_bar_gaze"
+    <!-- 校准按钮（始终可见，底部右侧） -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/calibrateButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_margin="8dp"
+        android:src="@android:drawable/ic_menu_compass"
+        android:scaleType="centerInside"
+        app:fabSize="mini"
+        app:backgroundTint="#33FFFFFF"
+        app:tint="@color/warm_text_primary"
         app:layout_constraintBottom_toTopOf="@id/bottomInfo"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- 角色切换按钮（左上角） -->
+    <!-- 角色切换按钮 -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/roleButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="12dp"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_margin="8dp"
         android:src="@android:drawable/ic_menu_manage"
-        app:layout_constraintTop_toTopOf="parent"
+        android:scaleType="centerInside"
+        app:fabSize="mini"
+        app:backgroundTint="#33FFFFFF"
+        app:tint="@color/white"
+        app:layout_constraintTop_toBottomOf="@id/topStatusBar"
         app:layout_constraintStart_toStartOf="parent" />
 
-    <!-- 校准按钮（右上角） -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/settingsButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="12dp"
-        android:src="@android:drawable/ic_menu_preferences"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- 调试叠加层（默认隐藏，双击设备ID切换） -->
+    <!-- 调试叠加层 -->
     <include layout="@layout/debug_panel" />
 </androidx.constraintlayout.widget.ConstraintLayout>
