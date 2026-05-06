@@ -522,7 +522,6 @@ class MainActivity : AppCompatActivity(),
     private var gazeProgressJob: Job? = null
 
     private fun onGazeDetectedStart() {
-        gazeStartTimeMs = System.currentTimeMillis()
         perceptionPhaseActive = true
         guidancePhaseActive = false
         gazeHaloView.onGazeDetected()
@@ -750,9 +749,13 @@ class MainActivity : AppCompatActivity(),
 
     override fun onGazeAtScreen(confidence: Float) {
         runOnUiThread {
+            val justStarted = !isLookingAtScreen
             isLookingAtScreen = true
             currentConfidence = confidence
-            onGazeDetectedStart()
+            if (justStarted) {
+                gazeStartTimeMs = System.currentTimeMillis()
+                onGazeDetectedStart()
+            }
             feedCoordinatorGaze(true, confidence)
             updateScanUI()
             publishState()
