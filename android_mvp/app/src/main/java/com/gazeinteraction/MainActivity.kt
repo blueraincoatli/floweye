@@ -340,6 +340,7 @@ class MainActivity : AppCompatActivity(),
                     gazeHaloView.enterScanMode()
                     arcProgressView.visibility = View.VISIBLE
                     arcProgressView.arcColor = currentTheme.haloColorFor(deviceRole)
+                    arcProgressView.progress = 0f
                     applyDepthColor(currentMenuDepth)
                 }
                 optionNameText.visibility = View.VISIBLE
@@ -357,6 +358,7 @@ class MainActivity : AppCompatActivity(),
                 gazeHaloView.enterConfirmMode()
                 arcProgressView.visibility = View.VISIBLE
                 arcProgressView.arcColor = currentTheme.haloColorFor(deviceRole)
+                arcProgressView.progress = 0f
                 optionNameText.visibility = View.VISIBLE
                 applyDepthColor(99)
                 calibrateButton.alpha = 0.3f
@@ -410,6 +412,11 @@ class MainActivity : AppCompatActivity(),
         gazeHaloYes?.onGazeLost()
         gazeHaloNo?.onGazeLost()
         gazeProgressJob?.cancel()
+        // 重置弧线进度，避免残留的半圆弧
+        gazeHaloView.arcProgress = 0f
+        gazeHaloYes?.arcProgress = 0f
+        gazeHaloNo?.arcProgress = 0f
+        arcProgressView.progress = 0f
     }
 
     private fun startGazeProgress() {
