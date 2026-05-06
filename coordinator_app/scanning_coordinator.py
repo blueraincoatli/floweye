@@ -925,7 +925,8 @@ class ScanningCoordinator:
         self._dwell_start = time.time()
         self.gaze.reset()  # 清除 latch，允许 CONFIRM 阶段的新选择
         self.publish_decision("confirm", option)
-        threading.Thread(target=lambda: self.tts.speak("确认" + option.get("tts_prompt", option.get("label", ""))), daemon=True).start()
+        # 阻塞式 TTS：用户需要听完确认提示才能做决定
+        self.tts.speak("确认" + option.get("tts_prompt", option.get("label", "")))
 
     def _execute_selection(self) -> None:
         if self._confirm_option:
