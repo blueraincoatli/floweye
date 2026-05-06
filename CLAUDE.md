@@ -156,8 +156,8 @@ IDLE -> SCAN -> CONFIRM -> ALERT (或回到 SCAN/IDLE)
 ## 当前进度
 
 详细进度见 `todo.md`。核心状态：
-- **已完成**: Android MVP、视线检测、MQTT通信、双协调器、模拟联调、自动化测试
-- **进行中**: Android 真机对接 scanning_coordinator、华为设备实测
+- **已完成**: Android MVP、视线检测、MQTT通信、双协调器、模拟联调、自动化测试、Android UI 重设计（光圈引导系统，详见 `docs/superpowers/specs/2026-05-06-floweye-ui-redesign-design.md`）、真机联调（华为 NOH-AN01）
+- **进行中**: （无）
 - **待开始**: iOS 版本、3+设备直接选择、护理端 Web 界面、TLS、临床测试
 
 **免责声明**: 本项目为研究和概念验证目的开发，请在实际医疗环境中使用前进行充分测试和验证。

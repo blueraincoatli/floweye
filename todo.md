@@ -14,12 +14,14 @@
 - [x] 已验证场景：`single_select`、`dual_confirm`、`dual_skip`、`dual_emergency`
 - [x] 协调器自动化测试（当前 `8 passed`）
 - [x] 异步 TTS 解耦，修复紧急触发时序问题
+- [x] Android UI 重设计 — 光圈引导系统（GazeHaloView + ArcProgressView + 三主题 + 两段式反馈）
+- [x] Android 真机对接 `scanning_coordinator.py`（MQTT 联调通过）
+- [x] 华为设备实测（NOH-AN01，视线检测 + 光圈引导 + 协调器联调全流程）
+- [x] 按钮图标、主题适配、弧线进度、辉光裁切等 UI 细节修复
 
 ## 进行中
 
-- [ ] Android 真机对接 `scanning_coordinator.py`
-- [ ] 华为设备实测
-- [ ] Android 端真实 payload 与协调器联调确认
+（无）
 
 ## 待开始
 

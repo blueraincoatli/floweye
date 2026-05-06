@@ -1,5 +1,7 @@
 # Floweye UI 重设计：光圈引导系统 实施计划
 
+> **状态: COMPLETED (2026-05-06)** — 8 个任务全部完成，10 个提交已合入 main，真机联调通过。
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 将 Android 端界面从粗糙的功能性 UI 升级为带有视线引导光圈、多主题切换、两段式反馈的精致交互系统。
