@@ -781,8 +781,10 @@ class MainActivity : AppCompatActivity(),
 
         when (engine.state) {
             CoordinatorEngine.State.IDLE -> {
-                if (interpreter.evaluateWake(looking, confidence, gazeStartTimeMs)) {
-                    engine.handleAction("wake")
+                if (looking) {
+                    if (interpreter.evaluateWake(looking, confidence, gazeStartTimeMs)) {
+                        engine.handleAction("wake")
+                    }
                 }
             }
             CoordinatorEngine.State.SCAN -> {

@@ -8,20 +8,25 @@ class MenuEngine(menuJson: String) {
     private val path = mutableListOf<Int>()
     private val selections = mutableListOf<String>()
 
+    companion object {
+        private const val KEY_ROOT = "options"
+        private const val KEY_SUBMENU = "submenu"
+    }
+
     fun getCurrentOptions(): List<JSONObject> {
         var current = root
         for (i in 0 until path.size - 1) {
-            val cats = current.optJSONArray("categories") ?: return emptyList()
-            current = cats.getJSONObject(path[i])
+            val items = current.optJSONArray(KEY_ROOT) ?: return emptyList()
+            current = items.getJSONObject(path[i])
         }
         if (path.isEmpty()) {
-            val cats = current.optJSONArray("categories") ?: return emptyList()
-            return (0 until cats.length()).map { cats.getJSONObject(it) }
+            val items = current.optJSONArray(KEY_ROOT) ?: return emptyList()
+            return (0 until items.length()).map { items.getJSONObject(it) }
         }
         val lastIdx = path.last()
-        val cat = current.optJSONArray("categories")?.getJSONObject(lastIdx) ?: return emptyList()
-        val opts = cat.optJSONArray("options") ?: return emptyList()
-        return (0 until opts.length()).map { opts.getJSONObject(it) }
+        val parent = current.optJSONArray(KEY_ROOT)?.getJSONObject(lastIdx) ?: return emptyList()
+        val subs = parent.optJSONArray(KEY_SUBMENU) ?: return emptyList()
+        return (0 until subs.length()).map { subs.getJSONObject(it) }
     }
 
     fun selectCurrent(): JSONObject? {
@@ -34,7 +39,7 @@ class MenuEngine(menuJson: String) {
             goBack()
             return null
         }
-        val subOptions = selected.optJSONArray("options")
+        val subOptions = selected.optJSONArray(KEY_SUBMENU)
         if (subOptions != null && subOptions.length() > 0) {
             path.add(idx)
             _currentIndex = 0

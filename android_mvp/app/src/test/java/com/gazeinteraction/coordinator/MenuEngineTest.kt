@@ -6,11 +6,11 @@ import org.junit.Assert.*
 class MenuEngineTest {
     private val sampleMenu = """
     {
-      "categories": [
+      "options": [
         {
           "id": "discomfort", "label": "不舒服",
           "tts_prompt": "您不舒服吗？",
-          "options": [
+          "submenu": [
             {"id": "headache", "label": "头疼", "tts_prompt": "您头疼吗？"},
             {"id": "stomachache", "label": "肚子疼", "tts_prompt": "您肚子疼吗？"},
             {"id": "back", "label": "返回", "action": "back"}
@@ -19,7 +19,7 @@ class MenuEngineTest {
         {
           "id": "care", "label": "护理",
           "tts_prompt": "需要身体护理吗？",
-          "options": [
+          "submenu": [
             {"id": "turn_over", "label": "想翻身", "tts_prompt": "您想翻身吗？"},
             {"id": "back", "label": "返回", "action": "back"}
           ]
