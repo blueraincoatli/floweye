@@ -36,6 +36,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
 
+import com.gazeinteraction.coordinator.BrokerService
+import com.gazeinteraction.coordinator.CoordinatorEngine
+import com.gazeinteraction.coordinator.HostManager
+import com.gazeinteraction.coordinator.AndroidTTSManager
+import com.gazeinteraction.coordinator.GazeInterpreter
+
 class MainActivity : AppCompatActivity(),
     FaceLandmarkerHelper.LandmarkerListener,
     GazeDetectionAlgorithm.GazeListener {
@@ -62,6 +68,11 @@ class MainActivity : AppCompatActivity(),
     private lateinit var confidenceText: TextView
     private lateinit var optionNameText: TextView
     private lateinit var calibrateButton: AppCompatImageButton
+    private lateinit var hostManager: HostManager
+    private var coordinatorEngine: CoordinatorEngine? = null
+    private var brokerService: BrokerService? = null
+    private var ttsManager: AndroidTTSManager? = null
+    private var gazeInterpreter: GazeInterpreter? = null
     private lateinit var settingsButton: AppCompatImageButton
     private lateinit var roleButton: AppCompatImageButton
     private lateinit var connectionDot: View
@@ -218,6 +229,86 @@ class MainActivity : AppCompatActivity(),
 
         gazeHaloView.onPerceptionStart = { perceptionPhaseActive = true }
         gazeHaloView.onGuidanceStart = { guidancePhaseActive = true }
+
+        // Self-hosted mode: detect role and setup coordinator
+        setupSelfHosted()
+    }
+
+    // ==================== Self-Hosted Coordinator ====================
+
+    private fun setupSelfHosted() {
+        hostManager = HostManager(this)
+        val role = hostManager.detectRole()
+
+        if (role == HostManager.Role.HOST) {
+            // Start embedded MQTT broker
+            brokerService = BrokerService()
+            brokerService?.start(1883)
+
+            // Initialize coordinator engine
+            try {
+                val menuJson = assets.open("menu_config.json").bufferedReader().readText()
+                val patientJson = assets.open("patient_config.json").bufferedReader().readText()
+                coordinatorEngine = CoordinatorEngine(menuJson, patientJson)
+                coordinatorEngine?.onDecision = { type, option ->
+                    publishCoordinatorDecision(type, option)
+                }
+                coordinatorEngine?.onTtsRequest = { text ->
+                    ttsManager?.speak(text)
+                }
+
+                // Initialize TTS
+                ttsManager = AndroidTTSManager(this)
+                ttsManager?.initialize { success ->
+                    if (success && coordinatorEngine != null) {
+                        // coordinator ready
+                    }
+                }
+
+                // Initialize gaze interpreter
+                gazeInterpreter = GazeInterpreter()
+            } catch (e: Exception) {
+                Log.e(TAG, "Coordinator init failed", e)
+            }
+        } else {
+            // Client mode: connect to host's broker
+            gazeInterpreter = GazeInterpreter()
+        }
+    }
+
+    private fun publishCoordinatorDecision(type: String, option: org.json.JSONObject?) {
+        val payload = org.json.JSONObject().apply {
+            put("type", type)
+            put("timestamp", System.currentTimeMillis())
+            put("menuDepth", coordinatorEngine?.currentDepth ?: 0)
+            if (option != null) {
+                put("optionId", option.optString("id", ""))
+                put("optionLabel", option.optString("label", ""))
+                put("ttsPrompt", option.optString("tts_prompt", ""))
+            }
+        }
+        try {
+            mqttClient.publishGazeState(mapOf(
+                "type" to type,
+                "payload" to payload.toString()
+            ))
+        } catch (e: Exception) {
+            Log.e(TAG, "Publish decision failed", e)
+        }
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    private fun processGazeForCoordinator(deviceId: String, looking: Boolean, confidence: Float) {
+        val engine = coordinatorEngine ?: return
+        @Suppress("UNUSED_VARIABLE") val interpreter = gazeInterpreter ?: return
+
+        if (engine.state == CoordinatorEngine.State.IDLE) {
+            // Check for wake
+            // Note: wake evaluation happens externally via gaze duration
+            engine.tick()
+        } else if (engine.state == CoordinatorEngine.State.SCAN || engine.state == CoordinatorEngine.State.CONFIRM) {
+            engine.tick()
+        }
     }
 
     // ==================== Theme ====================
@@ -572,7 +663,10 @@ class MainActivity : AppCompatActivity(),
                 }
                 setConnectionDotStatus("connecting")
                 Toast.makeText(this@MainActivity, "正在连接MQTT...", Toast.LENGTH_SHORT).show()
-                mqttClient.connect()
+                // connect() uses dynamic address from HostManager
+                if (!mqttClient.isConnected()) {
+                    mqttClient.connect(hostManager.getBrokerHost(), hostManager.getBrokerPort())
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "MQTT init failed", e)
                 Toast.makeText(this@MainActivity, "MQTT初始化异常: ${e.message}", Toast.LENGTH_LONG).show()
