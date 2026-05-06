@@ -18,7 +18,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- 顶部边缘状态条 — 所有控制按钮同一水平线 -->
+    <!-- 顶部边缘状态条 -->
     <LinearLayout
         android:id="@+id/topStatusBar"
         android:layout_width="match_parent"
@@ -36,37 +36,35 @@
             android:layout_height="8dp"
             android:background="@drawable/dot_status_idle" />
 
-        <!-- 角色切换按钮（操作者模式下可见，左排列） -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
+        <!-- 角色切换按钮（操作者模式可见） -->
+        <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/roleButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:layout_marginStart="8dp"
+            android:background="@drawable/bg_fab_circle"
+            android:src="@android:drawable/ic_menu_share"
+            android:scaleType="centerInside"
+            android:padding="10dp"
             android:contentDescription="@string/role_switch"
-            app:fabCustomSize="40dp"
-            app:maxImageSize="20dp"
-            app:srcCompat="@android:drawable/ic_menu_share"
-            app:backgroundTint="#1A000000"
-            app:tint="@color/warm_text_primary"
-            app:rippleColor="#1AFFFFFF" />
+            app:tint="@color/warm_text_primary" />
 
         <View
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <!-- 设置按钮（始终可见，右排列） -->
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
+        <!-- 设置按钮（始终可见） -->
+        <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/settingsButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_fab_circle"
+            android:src="@android:drawable/ic_menu_preferences"
+            android:scaleType="centerInside"
+            android:padding="10dp"
             android:contentDescription="@string/settings"
-            app:fabCustomSize="40dp"
-            app:maxImageSize="20dp"
-            app:srcCompat="@android:drawable/ic_menu_preferences"
-            app:backgroundTint="#1A000000"
-            app:tint="@color/warm_text_primary"
-            app:rippleColor="#1AFFFFFF" />
+            app:tint="@color/warm_text_primary" />
     </LinearLayout>
 
     <!-- 选项名文字 -->
@@ -153,18 +151,17 @@
     </LinearLayout>
 
     <!-- 校准按钮（始终可见，底部右侧） -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
+    <androidx.appcompat.widget.AppCompatImageButton
         android:id="@+id/calibrateButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
         android:layout_margin="8dp"
+        android:background="@drawable/bg_fab_circle"
+        android:src="@android:drawable/ic_menu_compass"
+        android:scaleType="centerInside"
+        android:padding="12dp"
         android:contentDescription="@string/calibrate"
-        app:fabCustomSize="48dp"
-        app:maxImageSize="24dp"
-        app:srcCompat="@android:drawable/ic_menu_compass"
-        app:backgroundTint="#1A000000"
         app:tint="@color/warm_text_primary"
-        app:rippleColor="#1AFFFFFF"
         app:layout_constraintBottom_toTopOf="@id/bottomInfo"
         app:layout_constraintEnd_toEndOf="parent" />
 

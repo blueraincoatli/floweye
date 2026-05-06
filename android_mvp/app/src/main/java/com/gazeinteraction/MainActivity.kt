@@ -26,7 +26,8 @@ import com.gazeinteraction.mqtt.MqttClient
 import com.gazeinteraction.ui.ArcProgressView
 import com.gazeinteraction.ui.GazeHaloView
 import com.gazeinteraction.ui.ThemeConfig
-import com.google.android.material.floatingactionbutton.FloatingActionButton
+import android.graphics.drawable.GradientDrawable
+import androidx.appcompat.widget.AppCompatImageButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -60,9 +61,9 @@ class MainActivity : AppCompatActivity(),
     private lateinit var gazeStatus: TextView
     private lateinit var confidenceText: TextView
     private lateinit var optionNameText: TextView
-    private lateinit var calibrateButton: FloatingActionButton
-    private lateinit var settingsButton: FloatingActionButton
-    private lateinit var roleButton: FloatingActionButton
+    private lateinit var calibrateButton: AppCompatImageButton
+    private lateinit var settingsButton: AppCompatImageButton
+    private lateinit var roleButton: AppCompatImageButton
     private lateinit var connectionDot: View
     private lateinit var topStatusBar: View
     private lateinit var bottomInfo: View
@@ -233,23 +234,22 @@ class MainActivity : AppCompatActivity(),
         gazeHaloView.haloColor = theme.haloColorFor(deviceRole)
         gazeHaloYes?.haloColor = theme.haloYes
         gazeHaloNo?.haloColor = theme.haloNo
-        // FAB 图标色调跟随主题
-        val fabTintList = android.content.res.ColorStateList.valueOf(theme.textPrimary)
-        settingsButton.imageTintList = fabTintList
-        roleButton.imageTintList = fabTintList
-        calibrateButton.imageTintList = fabTintList
-        // FAB 背景色调：浅色主题用半透明黑，深色主题用半透明白
-        val bgAlpha = if (theme == ThemeConfig.MODERN_MINIMAL) 0x12 else 0x1A
-        val fabBgColor = if (theme == ThemeConfig.MODERN_MINIMAL)
-            (bgAlpha shl 24) or 0x000000  // black-ish on light bg
-        else
-            (bgAlpha shl 24) or 0xFFFFFF  // white-ish on dark bg
-        val fabBgTint = android.content.res.ColorStateList.valueOf(fabBgColor)
-        settingsButton.backgroundTintList = fabBgTint
-        roleButton.backgroundTintList = fabBgTint
-        calibrateButton.backgroundTintList = fabBgTint
+        // 按钮图标色调
+        val iconTint = android.content.res.ColorStateList.valueOf(theme.textPrimary)
+        settingsButton.imageTintList = iconTint
+        roleButton.imageTintList = iconTint
+        calibrateButton.imageTintList = iconTint
+        // 按钮背景：浅色主题用半透明黑，深色主题用半透明白
+        val bgArgb = if (theme == ThemeConfig.MODERN_MINIMAL) 0x18000000.toInt() else 0x1AFFFFFF.toInt()
+        updateButtonBackground(settingsButton, bgArgb)
+        updateButtonBackground(roleButton, bgArgb)
+        updateButtonBackground(calibrateButton, bgArgb)
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(KEY_THEME, theme.name).apply()
+    }
+
+    private fun updateButtonBackground(button: AppCompatImageButton, argb: Int) {
+        (button.background as? GradientDrawable)?.setColor(argb)
     }
 
     private fun showSettingsDialog() {
