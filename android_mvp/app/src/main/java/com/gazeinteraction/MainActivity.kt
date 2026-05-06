@@ -254,7 +254,13 @@ class MainActivity : AppCompatActivity(),
         brokerService?.stop()
 
         brokerService = BrokerService()
-        brokerService?.start(1883)
+        brokerService?.start(this, 1883)
+        val running = brokerService?.isRunning ?: false
+        val err = brokerService?.lastError ?: ""
+        if (!running) {
+            Toast.makeText(this, "Broker启动失败: $err", Toast.LENGTH_LONG).show()
+            return
+        }
 
         try {
             val menuJson = assets.open("menu_config.json").bufferedReader().readText()
@@ -273,22 +279,21 @@ class MainActivity : AppCompatActivity(),
             }
 
             gazeInterpreter = GazeInterpreter()
-            // 等待 broker 就绪后断开旧连接并重连
+
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 if (::mqttClient.isInitialized) {
                     mqttClient.disconnect()
                     mqttClient.connect("127.0.0.1", 1883)
                 }
-            }, 800)
-            Toast.makeText(this, "主机模式已启动 (Broker:1883)", Toast.LENGTH_SHORT).show()
+            }, 1000)
         } catch (e: Exception) {
-            Log.e(TAG, "Coordinator init failed", e)
             Toast.makeText(this, "启动失败: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun publishCoordinatorDecision(type: String, option: org.json.JSONObject?) {
-        val payload = org.json.JSONObject().apply {
+        // 直接调用 handleCoordinationMessage 驱动 UI，不走 MQTT 回路
+        val msg = org.json.JSONObject().apply {
             put("type", type)
             put("timestamp", System.currentTimeMillis())
             put("menuDepth", coordinatorEngine?.currentDepth ?: 0)
@@ -298,14 +303,15 @@ class MainActivity : AppCompatActivity(),
                 put("ttsPrompt", option.optString("tts_prompt", ""))
             }
         }
-        try {
-            mqttClient.publishGazeState(mapOf(
-                "type" to type,
-                "payload" to payload.toString()
-            ))
-        } catch (e: Exception) {
-            Log.e(TAG, "Publish decision failed", e)
+        runOnUiThread {
+            handleCoordinationMessage("", msg.toString())
         }
+        // 同时发布到 MQTT，让其他客户端收到
+        try {
+            if (::mqttClient.isInitialized && mqttClient.isConnected()) {
+                mqttClient.publishGazeState(mapOf("type" to type, "payload" to msg.toString()))
+            }
+        } catch (_: Exception) {}
     }
 
     @Suppress("UNUSED_PARAMETER")
@@ -747,6 +753,7 @@ class MainActivity : AppCompatActivity(),
             isLookingAtScreen = true
             currentConfidence = confidence
             onGazeDetectedStart()
+            feedCoordinatorGaze(true, confidence)
             updateScanUI()
             publishState()
             startPeriodicPublish()
@@ -758,10 +765,42 @@ class MainActivity : AppCompatActivity(),
             isLookingAtScreen = false
             currentConfidence = 0.0f
             onGazeDetectedEnd()
+            feedCoordinatorGaze(false, 0f)
             updateScanUI()
             publishState()
             stopPeriodicPublish()
         }
+    }
+
+    private fun feedCoordinatorGaze(looking: Boolean, confidence: Float) {
+        val engine = coordinatorEngine ?: return
+        val interpreter = gazeInterpreter ?: return
+
+        when (engine.state) {
+            CoordinatorEngine.State.IDLE -> {
+                if (interpreter.evaluateWake(looking, confidence, gazeStartTimeMs)) {
+                    engine.handleAction("wake")
+                }
+            }
+            CoordinatorEngine.State.SCAN -> {
+                val action = interpreter.evaluate(deviceRole, looking, confidence, gazeStartTimeMs)
+                if (action != "none") {
+                    engine.handleAction(action)
+                }
+            }
+            CoordinatorEngine.State.CONFIRM -> {
+                if (deviceRole == "yes") {
+                    val action = interpreter.evaluate("yes", looking, confidence, gazeStartTimeMs)
+                    if (action == "select") engine.handleAction("confirm")
+                } else if (deviceRole == "no") {
+                    if (interpreter.evaluate("no", looking, confidence, gazeStartTimeMs) == "skip") {
+                        engine.handleAction("cancel")
+                    }
+                }
+            }
+            else -> {}
+        }
+        engine.tick()
     }
 
     private fun updateScanUI() {
