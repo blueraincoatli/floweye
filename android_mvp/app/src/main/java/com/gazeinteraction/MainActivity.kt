@@ -239,40 +239,50 @@ class MainActivity : AppCompatActivity(),
     private fun setupSelfHosted() {
         hostManager = HostManager(this)
         val role = hostManager.detectRole()
+        Log.i(TAG, "HostManager role: $role")
 
         if (role == HostManager.Role.HOST) {
-            // Start embedded MQTT broker
-            brokerService = BrokerService()
-            brokerService?.start(1883)
-
-            // Initialize coordinator engine
-            try {
-                val menuJson = assets.open("menu_config.json").bufferedReader().readText()
-                val patientJson = assets.open("patient_config.json").bufferedReader().readText()
-                coordinatorEngine = CoordinatorEngine(menuJson, patientJson)
-                coordinatorEngine?.onDecision = { type, option ->
-                    publishCoordinatorDecision(type, option)
-                }
-                coordinatorEngine?.onTtsRequest = { text ->
-                    ttsManager?.speak(text)
-                }
-
-                // Initialize TTS
-                ttsManager = AndroidTTSManager(this)
-                ttsManager?.initialize { success ->
-                    if (success && coordinatorEngine != null) {
-                        // coordinator ready
-                    }
-                }
-
-                // Initialize gaze interpreter
-                gazeInterpreter = GazeInterpreter()
-            } catch (e: Exception) {
-                Log.e(TAG, "Coordinator init failed", e)
-            }
+            startSelfHosted()
         } else {
-            // Client mode: connect to host's broker
             gazeInterpreter = GazeInterpreter()
+            Toast.makeText(this, "角色: ${role.name} (长按圆点→设置→强制主机)", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun startSelfHosted() {
+        // Stop existing broker if running
+        brokerService?.stop()
+
+        brokerService = BrokerService()
+        brokerService?.start(1883)
+
+        try {
+            val menuJson = assets.open("menu_config.json").bufferedReader().readText()
+            val patientJson = assets.open("patient_config.json").bufferedReader().readText()
+            coordinatorEngine = CoordinatorEngine(menuJson, patientJson)
+            coordinatorEngine?.onDecision = { type, option ->
+                publishCoordinatorDecision(type, option)
+            }
+            coordinatorEngine?.onTtsRequest = { text ->
+                ttsManager?.speak(text)
+            }
+
+            if (ttsManager == null) {
+                ttsManager = AndroidTTSManager(this)
+                ttsManager?.initialize { }
+            }
+
+            gazeInterpreter = GazeInterpreter()
+            // 等待 broker 就绪后重连 MQTT
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                if (::mqttClient.isInitialized) {
+                    mqttClient.connect("127.0.0.1", 1883)
+                }
+            }, 500)
+            Toast.makeText(this, "主机模式已启动 (Broker:1883)", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Coordinator init failed", e)
+            Toast.makeText(this, "启动失败: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -346,7 +356,13 @@ class MainActivity : AppCompatActivity(),
     private fun showSettingsDialog() {
         val themeNames = ThemeConfig.ALL.map { it.name }.toTypedArray()
         val currentIdx = ThemeConfig.ALL.indexOf(currentTheme).coerceAtLeast(0)
-        val options = arrayOf("切换主题", "切换角色 (当前: ${if (deviceRole == "yes") "是" else "否"})", "操作者模式: ${if (isOperatorMode) "开" else "关"}")
+        val hostLabel = if (::hostManager.isInitialized && hostManager.forceHostMode) "开" else "关"
+        val options = arrayOf(
+            "切换主题",
+            "切换角色 (当前: ${if (deviceRole == "yes") "是" else "否"})",
+            "操作者模式: ${if (isOperatorMode) "开" else "关"}",
+            "强制主机模式: $hostLabel"
+        )
         AlertDialog.Builder(this)
             .setTitle("设置")
             .setItems(options) { _, which ->
@@ -358,6 +374,18 @@ class MainActivity : AppCompatActivity(),
                         updateOperatorUI()
                         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                             .edit().putBoolean(KEY_OPERATOR_MODE, isOperatorMode).apply()
+                    }
+                    3 -> {
+                        if (::hostManager.isInitialized) {
+                            hostManager.forceHostMode = !hostManager.forceHostMode
+                            hostManager.detectRole()
+                            if (hostManager.role == HostManager.Role.HOST) {
+                                startSelfHosted()
+                            }
+                            Toast.makeText(this,
+                                "主机模式: ${if (hostManager.forceHostMode) "开" else "关"}",
+                                Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }

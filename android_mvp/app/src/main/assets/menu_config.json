@@ -1,0 +1,79 @@
+{
+  "version": "1.0",
+  "default_dwell_seconds": 5,
+  "options": [
+    {
+      "id": "uncomfortable",
+      "label": "不舒服",
+      "tts_prompt": "您不舒服吗？",
+      "priority": 1,
+      "submenu": [
+        {"id": "headache", "label": "头疼", "tts_prompt": "您头疼吗？", "priority": 1},
+        {"id": "stomachache", "label": "肚子疼", "tts_prompt": "您肚子疼吗？", "priority": 2},
+        {"id": "wound_pain", "label": "伤口疼", "tts_prompt": "您伤口疼吗？", "priority": 3},
+        {"id": "chest_tight", "label": "胸闷", "tts_prompt": "您胸闷或喘不过气吗？", "priority": 4, "urgency": "high"},
+        {"id": "back", "label": "返回", "tts_prompt": "返回上一级", "action": "back"}
+      ]
+    },
+    {
+      "id": "care",
+      "label": "身体护理",
+      "tts_prompt": "需要身体护理吗？",
+      "priority": 2,
+      "submenu": [
+        {"id": "turn_over", "label": "想翻身", "tts_prompt": "您想翻身吗？", "priority": 1},
+        {"id": "toilet", "label": "想上厕所", "tts_prompt": "您想上厕所吗？", "priority": 2},
+        {"id": "itchy", "label": "身体痒", "tts_prompt": "您身体痒或想擦身吗？", "priority": 3},
+        {"id": "back", "label": "返回", "tts_prompt": "返回上一级", "action": "back"}
+      ]
+    },
+    {
+      "id": "food_drink",
+      "label": "吃喝",
+      "tts_prompt": "需要吃喝吗？",
+      "priority": 3,
+      "submenu": [
+        {"id": "water", "label": "想喝水", "tts_prompt": "您想喝水吗？", "priority": 1},
+        {"id": "food", "label": "想吃东西", "tts_prompt": "您想吃东西吗？", "priority": 2},
+        {"id": "too_hot", "label": "太烫了", "tts_prompt": "是太烫了吗？", "priority": 3},
+        {"id": "back", "label": "返回", "tts_prompt": "返回上一级", "action": "back"}
+      ]
+    },
+    {
+      "id": "environment",
+      "label": "环境",
+      "tts_prompt": "需要调整环境吗？",
+      "priority": 4,
+      "submenu": [
+        {"id": "too_hot_env", "label": "太热了", "tts_prompt": "您是不是太热了？", "priority": 1},
+        {"id": "too_cold", "label": "太冷了", "tts_prompt": "您是不是太冷了？", "priority": 2},
+        {"id": "too_bright", "label": "灯太亮", "tts_prompt": "灯是不是太亮了？", "priority": 3},
+        {"id": "back", "label": "返回", "tts_prompt": "返回上一级", "action": "back"}
+      ]
+    },
+    {
+      "id": "social",
+      "label": "社交",
+      "tts_prompt": "需要社交帮助吗？",
+      "priority": 5,
+      "submenu": [
+        {"id": "family", "label": "想见家属", "tts_prompt": "您想见家属吗？", "priority": 1},
+        {"id": "nurse", "label": "需要护士", "tts_prompt": "您需要护士吗？", "priority": 2},
+        {"id": "quiet", "label": "想安静", "tts_prompt": "您想安静一下吗？", "priority": 3},
+        {"id": "back", "label": "返回", "tts_prompt": "返回上一级", "action": "back"}
+      ]
+    },
+    {
+      "id": "emergency",
+      "label": "紧急",
+      "tts_prompt": "需要紧急帮助吗？",
+      "priority": 99,
+      "urgency": "critical",
+      "submenu": [
+        {"id": "confirm_emergency", "label": "确认紧急呼叫", "tts_prompt": "确认紧急呼叫吗？这将会立即通知护士。", "priority": 1, "urgency": "critical", "skip_confirm": true},
+        {"id": "back", "label": "返回", "tts_prompt": "返回上一级", "action": "back"}
+      ]
+    }
+  ],
+  "night_mode_options": ["uncomfortable", "care", "food_drink", "emergency"]
+}
