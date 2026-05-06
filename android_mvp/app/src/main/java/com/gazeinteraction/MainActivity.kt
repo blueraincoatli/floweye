@@ -273,12 +273,13 @@ class MainActivity : AppCompatActivity(),
             }
 
             gazeInterpreter = GazeInterpreter()
-            // 等待 broker 就绪后重连 MQTT
+            // 等待 broker 就绪后断开旧连接并重连
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 if (::mqttClient.isInitialized) {
+                    mqttClient.disconnect()
                     mqttClient.connect("127.0.0.1", 1883)
                 }
-            }, 500)
+            }, 800)
             Toast.makeText(this, "主机模式已启动 (Broker:1883)", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Log.e(TAG, "Coordinator init failed", e)
