@@ -233,6 +233,21 @@ class MainActivity : AppCompatActivity(),
         gazeHaloView.haloColor = theme.haloColorFor(deviceRole)
         gazeHaloYes?.haloColor = theme.haloYes
         gazeHaloNo?.haloColor = theme.haloNo
+        // FAB 图标色调跟随主题
+        val fabTintList = android.content.res.ColorStateList.valueOf(theme.textPrimary)
+        settingsButton.imageTintList = fabTintList
+        roleButton.imageTintList = fabTintList
+        calibrateButton.imageTintList = fabTintList
+        // FAB 背景色调：浅色主题用半透明黑，深色主题用半透明白
+        val bgAlpha = if (theme == ThemeConfig.MODERN_MINIMAL) 0x12 else 0x1A
+        val fabBgColor = if (theme == ThemeConfig.MODERN_MINIMAL)
+            (bgAlpha shl 24) or 0x000000  // black-ish on light bg
+        else
+            (bgAlpha shl 24) or 0xFFFFFF  // white-ish on dark bg
+        val fabBgTint = android.content.res.ColorStateList.valueOf(fabBgColor)
+        settingsButton.backgroundTintList = fabBgTint
+        roleButton.backgroundTintList = fabBgTint
+        calibrateButton.backgroundTintList = fabBgTint
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit().putString(KEY_THEME, theme.name).apply()
     }
@@ -273,10 +288,12 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun updateOperatorUI() {
-        val visibility = if (isOperatorMode) View.VISIBLE else View.GONE
-        settingsButton.visibility = visibility
-        roleButton.visibility = visibility
-        confidenceText.visibility = if (isOperatorMode) View.VISIBLE else View.GONE
+        // 设置按钮始终可见
+        settingsButton.visibility = View.VISIBLE
+        // 角色切换和置信度只在操作者模式下显示
+        val operatorVisibility = if (isOperatorMode) View.VISIBLE else View.GONE
+        roleButton.visibility = operatorVisibility
+        confidenceText.visibility = operatorVisibility
     }
 
     // ==================== State Engine ====================

@@ -23,6 +23,7 @@
     <string name="device_id">设备ID</string>
     <string name="confidence_threshold">置信度阈值</string>
     <string name="calibrate">校准</string>
+    <string name="role_switch">切换角色</string>
     
     <!-- 错误信息 -->
     <string name="error_camera_init">摄像头初始化失败</string>

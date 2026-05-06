@@ -1,5 +1,10 @@
 {
   "permissions": {
-    "defaultMode": "bypassPermissions"
+    "defaultMode": "bypassPermissions",
+    "allow": [
+      "Bash(rm \"/c/Users/HongyuLi/.claude/settings/settings_kimi.json\")",
+      "Bash(rm \"/c/Users/HongyuLi/.claude/settings/settings_claude.json\")",
+      "Bash(rm \"/c/Users/HongyuLi/.claude/settings/settings.json\")"
+    ]
   }
 }

@@ -8,12 +8,13 @@
     android:background="@color/warm_bg"
     tools:context=".MainActivity">
 
+    <!-- 顶部边缘状态条 — 所有控制按钮同一水平线 -->
     <LinearLayout
         android:id="@+id/topStatusBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
+        android:paddingHorizontal="12dp"
         android:paddingTop="8dp"
         android:gravity="center_vertical"
         app:layout_constraintTop_toTopOf="parent">
@@ -24,6 +25,18 @@
             android:layout_height="8dp"
             android:background="@drawable/dot_status_idle" />
 
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/roleButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:contentDescription="@string/role_switch"
+            app:fabCustomSize="36dp"
+            app:maxImageSize="18dp"
+            app:srcCompat="@android:drawable/ic_menu_share"
+            app:backgroundTint="#1A000000"
+            app:tint="@color/warm_text_primary" />
+
         <View
             android:layout_width="0dp"
             android:layout_height="0dp"
@@ -31,13 +44,14 @@
 
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/settingsButton"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:src="@android:drawable/ic_menu_preferences"
-            android:scaleType="centerInside"
-            app:fabSize="mini"
-            app:backgroundTint="#33FFFFFF"
-            app:tint="@color/white" />
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/settings"
+            app:fabCustomSize="36dp"
+            app:maxImageSize="18dp"
+            app:srcCompat="@android:drawable/ic_menu_preferences"
+            app:backgroundTint="#1A000000"
+            app:tint="@color/warm_text_primary" />
     </LinearLayout>
 
     <LinearLayout
@@ -135,13 +149,14 @@
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/calibrateButton"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_margin="8dp"
-        android:src="@android:drawable/ic_menu_compass"
-        android:scaleType="centerInside"
-        app:fabSize="mini"
-        app:backgroundTint="#33FFFFFF"
+        android:contentDescription="@string/calibrate"
+        app:fabCustomSize="44dp"
+        app:maxImageSize="22dp"
+        app:srcCompat="@android:drawable/ic_menu_compass"
+        app:backgroundTint="#1A000000"
         app:tint="@color/warm_text_primary"
         app:layout_constraintBottom_toTopOf="@id/bottomInfo"
         app:layout_constraintEnd_toEndOf="parent" />

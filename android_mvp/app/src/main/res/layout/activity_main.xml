@@ -18,14 +18,14 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- 顶部边缘状态条 -->
+    <!-- 顶部边缘状态条 — 所有控制按钮同一水平线 -->
     <LinearLayout
         android:id="@+id/topStatusBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="12dp"
+        android:paddingHorizontal="12dp"
+        android:paddingTop="10dp"
         android:gravity="center_vertical"
         app:layout_constraintTop_toTopOf="parent">
 
@@ -36,21 +36,37 @@
             android:layout_height="8dp"
             android:background="@drawable/dot_status_idle" />
 
+        <!-- 角色切换按钮（操作者模式下可见，左排列） -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/roleButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:contentDescription="@string/role_switch"
+            app:fabCustomSize="40dp"
+            app:maxImageSize="20dp"
+            app:srcCompat="@android:drawable/ic_menu_share"
+            app:backgroundTint="#1A000000"
+            app:tint="@color/warm_text_primary"
+            app:rippleColor="#1AFFFFFF" />
+
         <View
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <!-- 设置按钮（操作者模式下可见） -->
+        <!-- 设置按钮（始终可见，右排列） -->
         <com.google.android.material.floatingactionbutton.FloatingActionButton
             android:id="@+id/settingsButton"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:src="@android:drawable/ic_menu_preferences"
-            android:scaleType="centerInside"
-            app:fabSize="mini"
-            app:backgroundTint="#33FFFFFF"
-            app:tint="@color/white" />
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/settings"
+            app:fabCustomSize="40dp"
+            app:maxImageSize="20dp"
+            app:srcCompat="@android:drawable/ic_menu_preferences"
+            app:backgroundTint="#1A000000"
+            app:tint="@color/warm_text_primary"
+            app:rippleColor="#1AFFFFFF" />
     </LinearLayout>
 
     <!-- 选项名文字 -->
@@ -139,30 +155,18 @@
     <!-- 校准按钮（始终可见，底部右侧） -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/calibrateButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_margin="8dp"
-        android:src="@android:drawable/ic_menu_compass"
-        android:scaleType="centerInside"
-        app:fabSize="mini"
-        app:backgroundTint="#33FFFFFF"
+        android:contentDescription="@string/calibrate"
+        app:fabCustomSize="48dp"
+        app:maxImageSize="24dp"
+        app:srcCompat="@android:drawable/ic_menu_compass"
+        app:backgroundTint="#1A000000"
         app:tint="@color/warm_text_primary"
+        app:rippleColor="#1AFFFFFF"
         app:layout_constraintBottom_toTopOf="@id/bottomInfo"
         app:layout_constraintEnd_toEndOf="parent" />
-
-    <!-- 角色切换按钮 -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/roleButton"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_margin="8dp"
-        android:src="@android:drawable/ic_menu_manage"
-        android:scaleType="centerInside"
-        app:fabSize="mini"
-        app:backgroundTint="#33FFFFFF"
-        app:tint="@color/white"
-        app:layout_constraintTop_toBottomOf="@id/topStatusBar"
-        app:layout_constraintStart_toStartOf="parent" />
 
     <!-- 调试叠加层 -->
     <include layout="@layout/debug_panel" />
