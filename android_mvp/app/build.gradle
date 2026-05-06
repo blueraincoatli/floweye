@@ -40,6 +40,8 @@ android {
     packagingOptions {
         pickFirst '**/libc++_shared.so'
         pickFirst '**/libtensorflowlite_jni.so'
+        exclude 'META-INF/INDEX.LIST'
+        exclude 'META-INF/io.netty.versions.properties'
     }
 
     aaptOptions {
