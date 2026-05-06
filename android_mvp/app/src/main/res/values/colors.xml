@@ -1,90 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 主要颜色 -->
+    <!-- ========== 温暖疗愈主题 ========== -->
+    <color name="warm_bg">#FF1C1917</color>
+    <color name="warm_halo_yes">#FF6BA87A</color>
+    <color name="warm_halo_no">#FFC47A6E</color>
+    <color name="warm_text_primary">#FFF5F0E8</color>
+    <color name="warm_bg_idle">#FF262220</color>
+
+    <!-- ========== 高对比功能主题 ========== -->
+    <color name="contrast_bg">#FF000000</color>
+    <color name="contrast_halo_yes">#FF00FF66</color>
+    <color name="contrast_halo_no">#FFFF3333</color>
+    <color name="contrast_text_primary">#FFFFFFFF</color>
+    <color name="contrast_bg_idle">#FF0A0A0A</color>
+
+    <!-- ========== 现代简约主题 ========== -->
+    <color name="minimal_bg">#FFF5F5F0</color>
+    <color name="minimal_halo_yes">#FF4A7FD9</color>
+    <color name="minimal_halo_no">#FF7A8B9E</color>
+    <color name="minimal_text_primary">#FF1A1A1A</color>
+    <color name="minimal_bg_idle">#FFE8E8E3</color>
+
+    <!-- ========== 通用状态颜色 ========== -->
+    <color name="status_connected">#FF6BA87A</color>
+    <color name="status_connecting">#FFD4A373</color>
+    <color name="status_disconnected">#FFA86B6B</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="ic_launcher_background">#FF1E1E2E</color>
+
+    <!-- ========== 确认层颜色（通用） ========== -->
+    <color name="confirm_bg">#FF2E1F2E</color>
+    <color name="confirm_halo_yes">#FFB87AD9</color>
+    <color name="confirm_halo_no">#FFD97A8A</color>
+    <color name="confirm_text">#FFCE93D8</color>
+
+    <!-- ========== 层级背景色（扫描态） ========== -->
+    <color name="bg_level_0">#FF0D1825</color>
+    <color name="bg_level_1">#FF0D2137</color>
+    <color name="bg_level_2">#FF0D3320</color>
+
+    <!-- ========== 旧颜色保留（向后兼容） ========== -->
     <color name="purple_200">#FFBB86FC</color>
     <color name="purple_500">#FF6200EE</color>
     <color name="purple_700">#FF3700B3</color>
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-
-    <!-- 应用特定颜色 -->
     <color name="primary_blue">#FF2196F3</color>
     <color name="primary_green">#FF4CAF50</color>
     <color name="primary_red">#FFF44336</color>
-
-    <!--
-        按钮颜色 - 低饱和度柔和配色
-        原则：降低饱和度、避免纯黑纯白，减少视觉疲劳
-        区分策略：不注视时偏灰（中性低饱和），注视时呈现明确的低饱和彩色，
-                 以色相差异为主，避免亮度/对比度过高导致刺眼
-    -->
-    <!-- "是"按钮：灰青绿（不注视） → 柔和绿（注视） -->
     <color name="yes_button_normal">#FF4A5C52</color>
     <color name="yes_button_selected">#FF3D6B4F</color>
     <color name="yes_button_gaze">#FF7DB88A</color>
-
-    <!-- "否"按钮：灰褐（不注视） → 柔和玫瑰红（注视） -->
     <color name="no_button_normal">#FF5C4A48</color>
     <color name="no_button_selected">#FF6B3D3D</color>
     <color name="no_button_gaze">#FFB88A8A</color>
-
-    <!-- 背景颜色 -->
     <color name="background_dark">#FF1E1E2E</color>
     <color name="background_light">#FFFFFFFF</color>
-
-    <!-- 文本颜色 -->
     <color name="text_primary">#FFF0F0F0</color>
     <color name="text_secondary">#FFB0B0B0</color>
     <color name="text_on_primary">#FFF0F0F0</color>
-
-    <!-- 状态颜色 -->
-    <color name="status_connected">#FF6BA87A</color>
-    <color name="status_disconnected">#FFA86B6B</color>
-    <color name="status_initializing">#FFD4A373</color>
-
-    <!-- 启动图标背景 -->
-    <color name="ic_launcher_background">#FF1E1E2E</color>
-
-    <!-- 空闲态暖色背景 -->
     <color name="background_warm">#FF3D3D2E</color>
-
-    <!-- 层级背景色 -->
-    <color name="bg_level_0">#FF1E1E2E</color>
-    <color name="bg_level_1">#FF0D2137</color>
-    <color name="bg_level_2">#FF0D3320</color>
-    <color name="bg_confirm">#FF331A2E</color>
-
-    <!-- 层级选项文字色 -->
     <color name="text_level_1">#FF90CAF9</color>
     <color name="text_level_2">#FFA5D6A7</color>
     <color name="text_confirm">#FFCE93D8</color>
-
-    <!-- 层级按钮颜色：是/否 每层不同 -->
-    <!-- Level 0 是: 蓝调 -->
     <color name="yes_normal_l0">#FF2E4057</color>
     <color name="yes_gaze_l0">#FF4A90D9</color>
-    <!-- Level 1 是: 绿调 -->
     <color name="yes_normal_l1">#FF2E5740</color>
     <color name="yes_gaze_l1">#FF4AD97A</color>
-    <!-- Level 2 是: 橙调 -->
     <color name="yes_normal_l2">#FF57402E</color>
     <color name="yes_gaze_l2">#FFD9A04A</color>
-    <!-- Confirm 是: 紫调 -->
     <color name="yes_normal_cf">#FF402E57</color>
     <color name="yes_gaze_cf">#FF904AD9</color>
-
-    <!-- Level 0 否 -->
     <color name="no_normal_l0">#FF57312E</color>
     <color name="no_gaze_l0">#FFD9564A</color>
-    <!-- Level 1 否 -->
     <color name="no_normal_l1">#FF57312E</color>
     <color name="no_gaze_l1">#FFD9564A</color>
-    <!-- Level 2 否 -->
     <color name="no_normal_l2">#FF57312E</color>
     <color name="no_gaze_l2">#FFD9564A</color>
-    <!-- Cancel 否 -->
     <color name="no_normal_cf">#FF57312E</color>
     <color name="no_gaze_cf">#FFD9564A</color>
 </resources>
