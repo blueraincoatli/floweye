@@ -11,6 +11,7 @@ class AndroidTTSManager(private val context: Context) {
     private var initDone = false
     private val pendingQueue = Collections.synchronizedList(mutableListOf<String>())
     private var isSpeaking = false
+    var onSpeechDone: (() -> Unit)? = null
 
     fun initialize(callback: (Boolean) -> Unit) {
         tts = TextToSpeech(context) { status ->
@@ -22,11 +23,13 @@ class AndroidTTSManager(private val context: Context) {
                     override fun onStart(id: String?) {}
                     override fun onDone(id: String?) {
                         isSpeaking = false
+                        onSpeechDone?.invoke()
                         processNext()
                     }
                     @Deprecated("")
                     override fun onError(id: String?) {
                         isSpeaking = false
+                        onSpeechDone?.invoke()
                         processNext()
                     }
                 })
@@ -63,11 +66,18 @@ class AndroidTTSManager(private val context: Context) {
 
     private fun doSpeak(text: String) {
         isSpeaking = true
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, text.take(10))
         } else {
             @Suppress("DEPRECATION")
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null)
+        }
+        // 若 speak 调用本身失败（如 TTS 引擎未就绪），需主动触发完成回调，
+        // 否则 CoordinatorEngine.scanPhase 会永久卡在 "announce"
+        if (result == TextToSpeech.ERROR) {
+            isSpeaking = false
+            onSpeechDone?.invoke()
+            processNext()
         }
     }
 

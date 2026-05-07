@@ -38,6 +38,7 @@ class MqttClient(
         private const val GAZE_STATUS_TOPIC = "$TOPIC_PREFIX/device/%s/gaze_status"
         private const val DEVICE_STATUS_TOPIC = "$TOPIC_PREFIX/device/%s/status"
         private const val COORDINATION_TOPIC = "$TOPIC_PREFIX/coordination/decision"
+        private const val REMOTE_GAZE_TOPIC = "$TOPIC_PREFIX/device/+/gaze_status"
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -158,6 +159,23 @@ class MqttClient(
     }
 
     /**
+     * 发布协调器决策到 coordination/decision 话题
+     */
+    fun publishCoordinationMessage(data: Map<String, Any>) {
+        if (!isConnected) {
+            Log.w(TAG, "MQTT未连接，无法发布协调决策")
+            return
+        }
+        try {
+            val message = gson.toJson(data)
+            pahoClient?.publish(COORDINATION_TOPIC, message.toByteArray(), QOS, false)
+            Log.d(TAG, "协调决策已发布: $message")
+        } catch (e: Exception) {
+            Log.e(TAG, "协调决策发布失败", e)
+        }
+    }
+
+    /**
      * 发布设备状态
      */
     private fun publishDeviceStatus(status: String) {
@@ -186,6 +204,18 @@ class MqttClient(
             Log.i(TAG, "成功订阅协调话题: $COORDINATION_TOPIC")
         } catch (e: Exception) {
             Log.e(TAG, "订阅协调话题失败", e)
+        }
+    }
+
+    /**
+     * 订阅远程设备视线状态（仅 HOST 调用，用于双设备模式）
+     */
+    fun subscribeRemoteGazeStatus() {
+        try {
+            pahoClient?.subscribe(REMOTE_GAZE_TOPIC, QOS)
+            Log.i(TAG, "成功订阅远程视线话题: $REMOTE_GAZE_TOPIC")
+        } catch (e: Exception) {
+            Log.e(TAG, "订阅远程视线话题失败", e)
         }
     }
 

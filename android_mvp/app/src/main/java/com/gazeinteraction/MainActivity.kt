@@ -131,6 +131,18 @@ class MainActivity : AppCompatActivity(),
     private var perceptionPhaseActive = false
     private var guidancePhaseActive = false
 
+    // Remote gaze tracking (HOST receives CLIENT gaze via MQTT)
+    private data class RemoteGazeState(
+        var gazeStartMs: Long = 0L,
+        var isLooking: Boolean = false,
+        var role: String = "yes",
+        var actionConsumed: Boolean = false
+    )
+    private val remoteGazeStates = HashMap<String, RemoteGazeState>()
+
+    // Local gaze debounce: require look-away before next action
+    private var localActionConsumed = false
+
     // MQTT throttle
     private var lastPublishTimeMs: Long = 0
     private val PUBLISH_MIN_INTERVAL_MS = 500L
@@ -276,6 +288,18 @@ class MainActivity : AppCompatActivity(),
             if (ttsManager == null) {
                 ttsManager = AndroidTTSManager(this)
                 ttsManager?.initialize { }
+                ttsManager?.onSpeechDone = {
+                    coordinatorEngine?.onTtsComplete()
+                    // CONFIRM 状态 TTS 播完后，进入等待确认阶段
+                    if (coordinatorEngine?.state == CoordinatorEngine.State.CONFIRM && isConfirmAnnouncing) {
+                        isConfirmAnnouncing = false
+                        runOnUiThread {
+                            gazeStartTimeMs = System.currentTimeMillis()
+                            localActionConsumed = false
+                            updateUIForState()
+                        }
+                    }
+                }
             }
 
             gazeInterpreter = GazeInterpreter()
@@ -306,10 +330,20 @@ class MainActivity : AppCompatActivity(),
         runOnUiThread {
             handleCoordinationMessage("", msg.toString())
         }
-        // 同时发布到 MQTT，让其他客户端收到
+        // 同时发布到 MQTT coordination/decision，让其他客户端收到
         try {
             if (::mqttClient.isInitialized && mqttClient.isConnected()) {
-                mqttClient.publishGazeState(mapOf("type" to type, "payload" to msg.toString()))
+                val data = mutableMapOf<String, Any>(
+                    "type" to type,
+                    "timestamp" to System.currentTimeMillis(),
+                    "menuDepth" to (coordinatorEngine?.currentDepth ?: 0)
+                )
+                if (option != null) {
+                    data["optionId"] = option.optString("id", "")
+                    data["optionLabel"] = option.optString("label", "")
+                    data["ttsPrompt"] = option.optString("tts_prompt", "")
+                }
+                mqttClient.publishCoordinationMessage(data)
             }
         } catch (_: Exception) {}
     }
@@ -424,6 +458,22 @@ class MainActivity : AppCompatActivity(),
 
     // ==================== State Engine ====================
 
+    /**
+     * 选项切换或状态变化后，若用户仍在注视，重新启动光环动画并同步注视计时。
+     * 解决连续注视穿过选项边界时光环不收缩的问题。
+     */
+    private fun restartHaloIfLooking() {
+        if (!isLookingAtScreen) return
+        gazeStartTimeMs = System.currentTimeMillis()
+        perceptionPhaseActive = true
+        guidancePhaseActive = false
+        Log.w(TAG, "[HALO] restartHalo: restarting gaze progress, screenState=$screenState")
+        gazeHaloView.onGazeDetected()
+        gazeHaloYes?.onGazeDetected()
+        gazeHaloNo?.onGazeDetected()
+        startGazeProgress()
+    }
+
     private fun updateUIForState() {
         val rootLayout = findViewById<androidx.constraintlayout.widget.ConstraintLayout>(R.id.rootLayout)
         when (screenState) {
@@ -468,6 +518,7 @@ class MainActivity : AppCompatActivity(),
                     arcProgressView.arcColor = currentTheme.haloColorFor(deviceRole)
                     arcProgressView.progress = 0f
                     applyDepthColor(currentMenuDepth)
+                    restartHaloIfLooking()
                 }
                 optionNameText.visibility = View.VISIBLE
                 calibrateButton.alpha = 0.3f
@@ -476,20 +527,29 @@ class MainActivity : AppCompatActivity(),
             }
             ScreenState.CONFIRM -> {
                 isAnnouncing = false
-                val label = if (deviceRole == "yes") "是" else "否"
-                mainButton.visibility = View.VISIBLE
-                mainButton.text = label
-                gazeHaloView.visibility = View.VISIBLE
-                gazeHaloView.haloColor = currentTheme.haloColorFor(deviceRole)
-                gazeHaloView.enterConfirmMode()
-                arcProgressView.visibility = View.VISIBLE
-                arcProgressView.arcColor = currentTheme.haloColorFor(deviceRole)
-                arcProgressView.progress = 0f
                 optionNameText.visibility = View.VISIBLE
                 applyDepthColor(99)
                 calibrateButton.alpha = 0.3f
                 roleButton.alpha = 0.3f
                 stopBreathingAnimation()
+                if (isConfirmAnnouncing) {
+                    // TTS 播报中：只显示文字，不显示按钮和光环
+                    mainButton.visibility = View.GONE
+                    gazeHaloView.visibility = View.GONE
+                    arcProgressView.visibility = View.GONE
+                } else {
+                    // TTS 播完：显示按钮和光环，开始检测视线
+                    val label = if (deviceRole == "yes") "是" else "否"
+                    mainButton.visibility = View.VISIBLE
+                    mainButton.text = label
+                    gazeHaloView.visibility = View.VISIBLE
+                    gazeHaloView.haloColor = currentTheme.haloColorFor(deviceRole)
+                    gazeHaloView.enterConfirmMode()
+                    arcProgressView.visibility = View.VISIBLE
+                    arcProgressView.arcColor = currentTheme.haloColorFor(deviceRole)
+                    arcProgressView.progress = 0f
+                    restartHaloIfLooking()
+                }
             }
             ScreenState.FEEDBACK -> {
                 isAnnouncing = false
@@ -560,6 +620,8 @@ class MainActivity : AppCompatActivity(),
                     perceptionPhaseActive = false
                     guidancePhaseActive = true
                 }
+                // 持续评估注视动作，随注视时长累积自动触发
+                feedCoordinatorGaze(true, currentConfidence)
                 delay(interval)
             }
         }
@@ -684,6 +746,9 @@ class MainActivity : AppCompatActivity(),
                     override fun onConnected() {
                         setConnectionDotStatus("connected")
                         startPeriodicPublish()
+                        if (::hostManager.isInitialized && hostManager.role == HostManager.Role.HOST) {
+                            mqttClient.subscribeRemoteGazeStatus()
+                        }
                     }
                     override fun onDisconnected() {
                         setConnectionDotStatus("disconnected")
@@ -775,37 +840,180 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
+    // 跟踪上一帧的引擎状态，状态切换时自动重置防抖
+    private var lastCoordinatorState: CoordinatorEngine.State? = null
+    // CONFIRM 两阶段：TTS 播报中（隐藏按钮/光环）→ TTS 完成后显示按钮开始检测
+    private var isConfirmAnnouncing = false
+
     private fun feedCoordinatorGaze(looking: Boolean, confidence: Float) {
         val engine = coordinatorEngine ?: return
         val interpreter = gazeInterpreter ?: return
 
+        // 引擎状态切换时自动重置防抖（SCAN→CONFIRM等），用户无需移开视线
+        if (engine.state != lastCoordinatorState) {
+            localActionConsumed = false
+            // 离开 CONFIRM 时重置标志
+            if (lastCoordinatorState == CoordinatorEngine.State.CONFIRM) {
+                isConfirmAnnouncing = false
+            }
+            lastCoordinatorState = engine.state
+            gazeStartTimeMs = System.currentTimeMillis()
+        }
+
+        // Debounce: require look-away after each action
+        if (!looking) {
+            localActionConsumed = false
+            engine.tick()
+            return
+        }
+        if (localActionConsumed) {
+            engine.tick()
+            return
+        }
+
+        val elapsed = System.currentTimeMillis() - gazeStartTimeMs
+
         when (engine.state) {
             CoordinatorEngine.State.IDLE -> {
-                if (looking) {
-                    if (interpreter.evaluateWake(looking, confidence, gazeStartTimeMs)) {
-                        engine.handleAction("wake")
-                    }
+                if (interpreter.evaluateWake(looking, confidence, gazeStartTimeMs)) {
+                    Log.w(TAG, "[FEED] WAKE triggered, elapsed=${elapsed}ms")
+                    engine.handleAction("wake")
+                    gazeStartTimeMs = System.currentTimeMillis()
+                    localActionConsumed = true
                 }
             }
             CoordinatorEngine.State.SCAN -> {
+                // 播报阶段：阻止注视动作，持续重置注视计时
+                if (engine.scanPhase == "announce") {
+                    gazeStartTimeMs = System.currentTimeMillis()
+                    localActionConsumed = false
+                    engine.tick()
+                    return
+                }
                 val action = interpreter.evaluate(deviceRole, looking, confidence, gazeStartTimeMs)
-                if (action != "none") {
-                    engine.handleAction(action)
+                Log.w(TAG, "[FEED] SCAN role=$deviceRole elapsed=${elapsed}ms conf=$confidence action=$action")
+                when (action) {
+                    "select", "skip" -> {
+                        Log.w(TAG, "[FEED] SCAN action='$action' -> handleAction (consumed)")
+                        engine.handleAction(action)
+                        gazeStartTimeMs = System.currentTimeMillis()
+                        localActionConsumed = true
+                    }
+                    "hesitate" -> {
+                        // 仅重置引擎 dwell 计时器，不消费注视、不重置注视计时
+                        engine.handleAction(action)
+                    }
                 }
             }
             CoordinatorEngine.State.CONFIRM -> {
+                // TTS 播报阶段：不检测视线，等 TTS 完成后 isConfirmAnnouncing 变为 false
+                if (isConfirmAnnouncing) {
+                    engine.tick()
+                    return
+                }
                 if (deviceRole == "yes") {
                     val action = interpreter.evaluate("yes", looking, confidence, gazeStartTimeMs)
-                    if (action == "select") engine.handleAction("confirm")
+                    Log.w(TAG, "[FEED] CONFIRM yes elapsed=${elapsed}ms conf=$confidence action=$action")
+                    if (action == "select") {
+                        Log.w(TAG, "[FEED] CONFIRM -> handleAction('confirm')")
+                        engine.handleAction("confirm")
+                        gazeStartTimeMs = System.currentTimeMillis()
+                        localActionConsumed = true
+                    }
                 } else if (deviceRole == "no") {
-                    if (interpreter.evaluate("no", looking, confidence, gazeStartTimeMs) == "skip") {
+                    val action = interpreter.evaluate("no", looking, confidence, gazeStartTimeMs)
+                    Log.w(TAG, "[FEED] CONFIRM no elapsed=${elapsed}ms conf=$confidence action=$action")
+                    if (action == "skip") {
+                        Log.w(TAG, "[FEED] CONFIRM -> handleAction('cancel')")
                         engine.handleAction("cancel")
+                        gazeStartTimeMs = System.currentTimeMillis()
+                        localActionConsumed = true
                     }
                 }
             }
             else -> {}
         }
         engine.tick()
+    }
+
+    private fun handleRemoteGaze(remoteDeviceId: String, role: String, looking: Boolean, confidence: Float, gazeDurationMs: Long) {
+        val engine = coordinatorEngine ?: return
+        val interpreter = gazeInterpreter ?: return
+
+        val state = remoteGazeStates.getOrPut(remoteDeviceId) { RemoteGazeState(role = role) }
+        state.role = role
+
+        // 引擎状态切换时自动重置远程设备防抖
+        if (engine.state != lastCoordinatorState) {
+            state.actionConsumed = false
+            state.isLooking = false
+            lastCoordinatorState = engine.state
+        }
+
+        // Debounce: reset on look-away, block until then
+        if (!looking) {
+            state.isLooking = false
+            state.actionConsumed = false
+            return
+        }
+        if (state.actionConsumed) return
+
+        // 播报阶段：阻止注视动作，持续重置状态
+        if (engine.state == CoordinatorEngine.State.SCAN && engine.scanPhase == "announce") {
+            state.actionConsumed = false
+            state.isLooking = false
+            return
+        }
+
+        // 用副机消息中携带的注视时长反推起始时间，避免MQTT延迟导致的时长丢失
+        val effectiveStartMs = if (gazeDurationMs > 0) {
+            System.currentTimeMillis() - gazeDurationMs
+        } else {
+            // 兼容旧消息：从首次收到looking=true开始计时
+            if (!state.isLooking) state.gazeStartMs = System.currentTimeMillis()
+            state.gazeStartMs
+        }
+        state.isLooking = true
+
+        when (engine.state) {
+            CoordinatorEngine.State.IDLE -> {
+                if (interpreter.evaluateWake(looking, confidence, effectiveStartMs)) {
+                    Log.i(TAG, "Remote gaze wake from $remoteDeviceId ($role)")
+                    engine.handleAction("wake")
+                    state.actionConsumed = true
+                }
+            }
+            CoordinatorEngine.State.SCAN -> {
+                val action = interpreter.evaluate(role, looking, confidence, effectiveStartMs)
+                when (action) {
+                    "select", "skip" -> {
+                        Log.i(TAG, "Remote gaze action from $remoteDeviceId ($role): $action")
+                        engine.handleAction(action)
+                        state.actionConsumed = true
+                    }
+                    "hesitate" -> {
+                        engine.handleAction(action)
+                    }
+                }
+            }
+            CoordinatorEngine.State.CONFIRM -> {
+                // TTS 播报阶段：不检测视线
+                if (isConfirmAnnouncing) return
+                if (role == "yes") {
+                    val action = interpreter.evaluate("yes", looking, confidence, effectiveStartMs)
+                    if (action == "select") {
+                        engine.handleAction("confirm")
+                        state.actionConsumed = true
+                    }
+                } else if (role == "no") {
+                    if (interpreter.evaluate("no", looking, confidence, effectiveStartMs) == "skip") {
+                        engine.handleAction("cancel")
+                        state.actionConsumed = true
+                    }
+                }
+            }
+            else -> {}
+        }
     }
 
     private fun updateScanUI() {
@@ -901,6 +1109,22 @@ class MainActivity : AppCompatActivity(),
     private fun handleCoordinationMessage(topic: String, message: String) {
         try {
             val json = org.json.JSONObject(message)
+
+            // Route remote gaze status to coordinator (dual-device mode)
+            if (json.has("lookingAtScreen")) {
+                val remoteDeviceId = json.optString("deviceId", "")
+                if (remoteDeviceId.isNotEmpty() && remoteDeviceId != deviceId) {
+                    handleRemoteGaze(
+                        remoteDeviceId,
+                        json.optString("role", "yes"),
+                        json.optBoolean("lookingAtScreen", false),
+                        json.optDouble("confidence", 0.0).toFloat(),
+                        json.optLong("gazeDurationMs", 0L)
+                    )
+                }
+                return
+            }
+
             val type = json.optString("type", "")
             val depth = json.optInt("menuDepth", 0)
             runOnUiThread {
@@ -942,11 +1166,12 @@ class MainActivity : AppCompatActivity(),
                     "confirm" -> {
                         screenState = ScreenState.CONFIRM
                         isAnnouncing = false
+                        isConfirmAnnouncing = true  // 先播 TTS，播完才显示按钮
                         delayedUiJob?.cancel()
                         val label = json.optString("optionLabel", "")
                         optionNameText.text = "确认: $label"
                         applyDepthColor(99)
-                        gazeStatus.text = "注视[是]确认选择"
+                        gazeStatus.text = ""
                         updateUIForState()
                     }
                     "action_feedback" -> {
@@ -1019,6 +1244,7 @@ class MainActivity : AppCompatActivity(),
                     "role" to deviceRole,
                     "lookingAtScreen" to isLookingAtScreen,
                     "confidence" to currentConfidence,
+                    "gazeDurationMs" to (if (isLookingAtScreen) System.currentTimeMillis() - gazeStartTimeMs else 0L),
                     "calibrated" to (::gazeDetectionAlgorithm.isInitialized && gazeDetectionAlgorithm.isCalibrated())
                 )
                 mqttClient.publishGazeState(data)

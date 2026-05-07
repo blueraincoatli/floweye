@@ -942,6 +942,8 @@ class ScanningCoordinator:
         # Record response time for adaptive dwell
         response_time = time.time() - self._option_started
         self._update_dwell(response_time)
+        label = option.get("label", "")
+        threading.Thread(target=lambda: self.tts.speak(f"已通知{label}"), daemon=True).start()
 
     def _skip_current(self) -> None:
         logger.info("[SKIP] Skipped current option by 'no' device gaze")

@@ -65,7 +65,7 @@ class GazeDetectionAlgorithm(private val context: Context) {
     private var consecutiveFrames = 0
     private var notLookingFrames = 0
     private val requiredConsecutiveFrames = 2
-    private val requiredNotLookingFrames = 10  // ~300ms @ 30fps，离开注视也需要防抖
+    private val requiredNotLookingFrames = 30  // ~1s @ 30fps，避免眨眼/追踪短暂丢失重置注视计时
 
     interface GazeListener {
         fun onGazeAtScreen(confidence: Float)

@@ -16,15 +16,29 @@ class CoordinatorEngine(
 
     private var confirmOption: JSONObject? = null
     private var dwellStart = System.currentTimeMillis()
+    private var idleSince = 0L  // 初始为0让首次唤醒不经过冷却期
     var roundCount = 0
         private set
     var onTtsRequest: ((String) -> Unit)? = null
     var onDecision: ((String, JSONObject?) -> Unit)? = null
     val currentDepth: Int get() = menuEngine.currentDepth
 
+    // Two-phase scan: "announce" = TTS播报中(只显示选项文字), "select" = 等待用户选择(显示是/否)
+    @Volatile var scanPhase: String = "select"
+        private set
+    private var scanGeneration: Int = 0
+
     fun handleAction(action: String) {
+        // 播报阶段忽略所有注视动作，避免误触发
+        // 仅在 SCAN 状态下生效：CONFIRM/IDLE 等状态不应被播报阶段阻挡
+        if (state == State.SCAN && scanPhase == "announce") return
         when (action) {
-            "wake" -> enterScan()
+            "wake" -> {
+                // IDLE冷却期：执行完或超时回IDLE后至少等5秒才接受新唤醒
+                if (state == State.IDLE &&
+                    System.currentTimeMillis() - idleSince < 5000) return
+                enterScan()
+            }
             "emergency" -> enterAlert()
             "hesitate" -> { if (state == State.SCAN) resetDwell() }
             "select" -> handleSelect()
@@ -39,9 +53,26 @@ class CoordinatorEngine(
         menuEngine.reset()
         roundCount = 0
         resetDwell()
+        scanGeneration++
+        onDecision?.invoke("transition", null)
         val opt = menuEngine.getCurrentOption()
         if (opt != null) {
-            onTtsRequest?.invoke(opt.optString("tts_prompt", opt.optString("label", "")))
+            startAnnounce(opt)
+        }
+    }
+
+    private fun startAnnounce(opt: JSONObject) {
+        scanPhase = "announce"
+        onDecision?.invoke("announce", opt)
+        onTtsRequest?.invoke(opt.optString("tts_prompt", opt.optString("label", "")))
+    }
+
+    fun onTtsComplete() {
+        if (state != State.SCAN || scanPhase != "announce") return
+        scanPhase = "select"
+        resetDwell()
+        val opt = menuEngine.getCurrentOption()
+        if (opt != null) {
             onDecision?.invoke("scan_progress", opt)
         }
     }
@@ -57,11 +88,12 @@ class CoordinatorEngine(
             onTtsRequest?.invoke("确认" + opt.optString("tts_prompt", opt.optString("label", "")))
             onDecision?.invoke("confirm", opt)
         } else {
+            // 进入子菜单，播报第一个选项
             val sub = menuEngine.getCurrentOption()
             if (sub != null) {
                 resetDwell()
-                onTtsRequest?.invoke(sub.optString("tts_prompt", sub.optString("label", "")))
-                onDecision?.invoke("scan_progress", sub)
+                scanGeneration++
+                startAnnounce(sub)
             }
         }
     }
@@ -87,9 +119,10 @@ class CoordinatorEngine(
         confirmOption = null
         state = State.SCAN
         resetDwell()
+        scanGeneration++
         val opt = menuEngine.getCurrentOption()
         if (opt != null) {
-            onDecision?.invoke("scan_progress", opt)
+            startAnnounce(opt)
         }
     }
 
@@ -108,7 +141,7 @@ class CoordinatorEngine(
                 resetDwell()
             }
             State.SCAN -> {
-                if (now - dwellStart >= getCurrentDwell()) {
+                if (scanPhase != "announce" && now - dwellStart >= getCurrentDwell()) {
                     advanceToNext()
                 }
             }
@@ -120,6 +153,7 @@ class CoordinatorEngine(
             State.WAITING -> {
                 if (now - dwellStart >= 3000) {
                     state = State.IDLE
+                    idleSince = now
                     onDecision?.invoke("idle", null)
                 }
             }
@@ -137,12 +171,13 @@ class CoordinatorEngine(
             roundCount++
             if (roundCount >= 1) {
                 state = State.IDLE
+                idleSince = System.currentTimeMillis()
                 onDecision?.invoke("idle", null)
                 return
             }
         }
-        onTtsRequest?.invoke(opt.optString("tts_prompt", opt.optString("label", "")))
-        onDecision?.invoke("scan_progress", opt)
+        scanGeneration++
+        startAnnounce(opt)
     }
 
     fun dwellRemaining(): Long = getCurrentDwell() - (System.currentTimeMillis() - dwellStart)

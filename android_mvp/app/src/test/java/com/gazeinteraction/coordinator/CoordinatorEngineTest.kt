@@ -5,7 +5,7 @@ import org.junit.Assert.*
 
 class CoordinatorEngineTest {
     private val testMenu = """
-    {"categories": [{"id":"x","label":"测试","tts_prompt":"测试?","options":[
+    {"options": [{"id":"x","label":"测试","tts_prompt":"测试?","submenu":[
       {"id":"a","label":"A","tts_prompt":"A?"},{"id":"b","label":"B","tts_prompt":"B?"}
     ]}]}
     """
@@ -37,6 +37,7 @@ class CoordinatorEngineTest {
     fun `hesitate resets dwell in SCAN`() {
         val engine = CoordinatorEngine(testMenu, "{}")
         engine.handleAction("wake")
+        engine.onTtsComplete()  // 模拟TTS播报完成，进入select阶段
         val before = engine.dwellRemaining()
         Thread.sleep(200)
         engine.handleAction("hesitate")
@@ -48,8 +49,23 @@ class CoordinatorEngineTest {
     fun `skip in SCAN advances to next option`() {
         val engine = CoordinatorEngine(testMenu, "{}")
         engine.handleAction("wake")
+        engine.onTtsComplete()  // 模拟TTS播报完成，进入select阶段
         engine.handleAction("skip")
         // Should still be in SCAN after skip
         assertEquals(CoordinatorEngine.State.SCAN, engine.state)
+    }
+
+    @Test
+    fun `actions blocked during announce phase`() {
+        val engine = CoordinatorEngine(testMenu, "{}")
+        engine.handleAction("wake")
+        assertEquals("announce", engine.scanPhase)
+        // 播报阶段 skip 应被忽略
+        engine.handleAction("skip")
+        assertEquals(CoordinatorEngine.State.SCAN, engine.state)
+        assertEquals("announce", engine.scanPhase)
+        // TTS完成后进入select阶段
+        engine.onTtsComplete()
+        assertEquals("select", engine.scanPhase)
     }
 }

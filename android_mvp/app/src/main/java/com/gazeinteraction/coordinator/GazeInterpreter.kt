@@ -2,9 +2,9 @@ package com.gazeinteraction.coordinator
 
 class GazeInterpreter(
     private val selectSec: Float = 1.5f,
-    private val skipSec: Float = 0.5f,
+    private val skipSec: Float = 1.5f,
     private val wakeSec: Float = 3.0f,
-    private val confidenceThreshold: Float = 0.55f
+    private val confidenceThreshold: Float = 0.45f
 ) {
     var isCalibrated: Boolean = true
 
