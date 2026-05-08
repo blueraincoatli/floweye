@@ -180,5 +180,5 @@ MIT License. This project is a research prototype. It has not been validated in 
 <br>
 
 <p align="right">
-  <sub>献给我的父亲。<br>For my father.</sub>
+  <sub>献给我的父亲<br>For my father</sub>
 </p>
