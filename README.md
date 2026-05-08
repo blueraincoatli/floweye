@@ -19,7 +19,7 @@
 | 眨眼/面部肌肉检测 | 难以区分自主眨眼和反射性眨眼，精度有限 |
 | 护理人员逐项猜测 | 效率低，容易遗漏，患者容易产生无助感 |
 
-本项目尝试用**两台普通的旧 Android 手机 + 支架**，通过前置摄像头检测视线方向，让患者注视"是"/"否"按钮完成菜单选择，成本接近于零。
+本项目尝试用**两台带前置摄像头的手机 + 支架**（HOST 需为 Android；CLIENT 可以是 Android 或 iPhone，只要运行视线检测并连接 MQTT），让患者注视"是"/"否"按钮完成菜单选择，成本接近于零。
 
 ### 当前状态
 
@@ -107,7 +107,7 @@ floweye3/
 
 ### 已知局限
 
-- 仅在健康人（开发者）和一台华为设备（NOH-AN01）上测试通过
+- 仅在健康人（开发者）和两台华为设备（NOH-AN01）上测试通过，双设备互斥已验证
 - 未在真实患者身上验证
 - 视线检测在强侧光、佩戴眼镜、头部大幅偏转等条件下可能不稳定
 - 双设备并排放置时，一台设备的摄像头可能误检测到用户正在看另一台——预期通过注视时长阈值降低误触，但未做严格的互斥处理
@@ -140,7 +140,7 @@ Existing approaches each have significant barriers:
 | Blink / facial muscle detection | Hard to distinguish voluntary blinks from reflexive ones; limited accuracy |
 | Caregivers guessing | Inefficient, error-prone, can cause patient frustration and learned helplessness |
 
-This project attempts to use **two ordinary Android phones + mounts** to detect gaze via the front-facing camera, letting patients select "Yes"/"No" through a multi-level menu at near-zero cost.
+This project attempts to use **two camera-equipped phones + mounts** (HOST must be Android; CLIENT can be Android or iOS — whichever runs gaze detection and connects via MQTT), letting patients select "Yes"/"No" through a multi-level menu at near-zero cost.
 
 ### Current Status
 
@@ -167,7 +167,7 @@ cd android_mvp
 
 ### Known Limitations
 
-- Tested only on healthy individuals and one Huawei device (NOH-AN01)
+- Tested only on healthy individuals and two Huawei devices (NOH-AN01); mutual-exclusion between devices verified
 - Not validated with patients
 - Gaze detection may be unstable under strong side-lighting, glasses, or significant head movement
 - Dual-device placement can cause cross-detection; mitigated by gaze-duration thresholds but not rigorously
