@@ -6,7 +6,7 @@
   "vision_ok": false,
   "preferred_mode": "auto",
   "single_device": {
-    "wake_gaze_seconds": 3.0,
+    "wake_gaze_seconds": 2.0,
     "select_gaze_seconds": 2.0,
     "emergency_gaze_seconds": 3.0,
     "dwell_seconds": 15,

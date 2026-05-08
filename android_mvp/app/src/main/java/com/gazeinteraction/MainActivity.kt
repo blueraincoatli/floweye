@@ -325,8 +325,8 @@ class MainActivity : AppCompatActivity(),
                 1.0f
             )
             val wakeSec = dualCfg?.optDouble("wake_gaze_seconds",
-                patientConf.optJSONObject("single_device")?.optDouble("wake_gaze_seconds", 3.0) ?: 3.0
-            )?.toFloat() ?: 3.0f
+                patientConf.optJSONObject("single_device")?.optDouble("wake_gaze_seconds", 2.0) ?: 2.0
+            )?.toFloat() ?: 2.0f
             gazeInterpreter = GazeInterpreter(selectSec, skipSec, wakeSec)
 
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({

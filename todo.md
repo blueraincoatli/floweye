@@ -18,6 +18,13 @@
 - [x] Android 真机对接 `scanning_coordinator.py`（MQTT 联调通过）
 - [x] 华为设备实测（NOH-AN01，视线检测 + 光圈引导 + 协调器联调全流程）
 - [x] 按钮图标、主题适配、弧线进度、辉光裁切等 UI 细节修复
+- [x] 自托管模式（CoordinatorEngine + 内嵌 MQTT Broker + 双设备无需 PC）
+- [x] 双设备视线 latch 修复（announce→select 过渡时主动清除 actionConsumed）
+- [x] TTS 延迟重复播报（可配置 1-3 次，间隔 3 秒）
+- [x] 设置面板重构（自定义布局 + 角色同步 + 播报次数滑块）
+- [x] CONFIRM 阶段副机"否"按钮修复（confirm_ready 消息通知）
+- [x] 患者参数调优（注视2s/跳过1.5s/唤醒2s/停留15s/TTS语速130）
+- [x] 配置文件同步（coordinator_app/ 与 Android assets/）
 
 ## 进行中
 

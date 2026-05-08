@@ -2,6 +2,8 @@
 
 本目录包含 FlowEye 的 Python 协调器实现、联调脚本和测试。
 
+> **注意**: 当前推荐使用 Android 自托管模式（两台设备独立运行，无需 PC）。本目录的 Python 协调器保留为 PC 模式和排障备用。详见项目 [README.md](../README.md)。
+
 ## 当前状态
 
 当前主线协调器是 `scanning_coordinator.py`，已经完成本地 MQTT 联调并验证以下场景：
@@ -11,6 +13,8 @@
 - `dual_skip`
 - `dual_emergency`
 
+Android 端已实现自托管模式（CoordinatorEngine + 内嵌 Broker），可作为无需 PC 的替代方案。
+
 保留的 `simple_coordinator.py` 主要用于：
 
 - 最小 MQTT 决策基线
@@ -19,8 +23,8 @@
 
 当前更完整的整体状态请看：
 
-- [project_status.md](D:\floweye3\docs\project_status.md)
-- [coordinator_implementation_plan.md](D:\floweye3\docs\coordinator_implementation_plan.md)
+- [project_status.md](../docs/project_status.md)
+- [coordinator_implementation_plan.md](../docs/coordinator_implementation_plan.md)
 
 ## 目录说明
 
