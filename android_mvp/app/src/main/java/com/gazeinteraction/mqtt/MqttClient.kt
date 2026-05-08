@@ -39,6 +39,7 @@ class MqttClient(
         private const val DEVICE_STATUS_TOPIC = "$TOPIC_PREFIX/device/%s/status"
         private const val COORDINATION_TOPIC = "$TOPIC_PREFIX/coordination/decision"
         private const val REMOTE_GAZE_TOPIC = "$TOPIC_PREFIX/device/+/gaze_status"
+        private const val ROLE_SYNC_TOPIC = "$TOPIC_PREFIX/coordination/role_sync"
     }
 
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -69,6 +70,9 @@ class MqttClient(
         brokerHost = host ?: prefs.getString(PREF_KEY_BROKER_HOST, DEFAULT_BROKER_HOST) ?: DEFAULT_BROKER_HOST
         brokerPort = port ?: prefs.getInt(PREF_KEY_BROKER_PORT, DEFAULT_BROKER_PORT)
         intentionalDisconnect = false
+
+        // 先彻底关闭旧连接，避免 clientId 冲突导致反复断开重连
+        closeOldClient()
 
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         Thread {
@@ -102,6 +106,7 @@ class MqttClient(
                         Log.i(TAG, "MQTT连接成功 (reconnect=%b): %s".format(reconnect, serverURI))
                         publishDeviceStatus("online")
                         subscribeToCoordinationTopic()
+                        subscribeRoleSync()
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             connectionListener?.onConnected()
                         }
@@ -220,17 +225,60 @@ class MqttClient(
     }
 
     /**
+     * 订阅角色同步消息（两台设备都调用）
+     */
+    fun subscribeRoleSync() {
+        try {
+            pahoClient?.subscribe(ROLE_SYNC_TOPIC, QOS)
+            Log.i(TAG, "成功订阅角色同步话题: $ROLE_SYNC_TOPIC")
+        } catch (e: Exception) {
+            Log.e(TAG, "订阅角色同步话题失败", e)
+        }
+    }
+
+    /**
+     * 发布角色同步消息
+     */
+    fun publishRoleSync(data: Map<String, Any>) {
+        if (!isConnected) {
+            Log.w(TAG, "MQTT未连接，无法发布角色同步")
+            return
+        }
+        try {
+            val message = gson.toJson(data)
+            pahoClient?.publish(ROLE_SYNC_TOPIC, message.toByteArray(), QOS, false)
+            Log.i(TAG, "角色同步已发布: $message")
+        } catch (e: Exception) {
+            Log.e(TAG, "角色同步发布失败", e)
+        }
+    }
+
+    /**
      * 断开连接
      */
+    private fun closeOldClient() {
+        try {
+            pahoClient?.let { old ->
+                try { old.disconnect() } catch (_: Exception) {}
+                try { old.close() } catch (_: Exception) {}
+            }
+        } catch (_: Exception) {}
+        isConnected = false
+        pahoClient = null
+    }
+
     fun disconnect() {
         intentionalDisconnect = true
         try {
             if (isConnected) {
                 publishDeviceStatus("offline")
-                isConnected = false
-                pahoClient?.disconnect()
-                pahoClient?.close()
             }
+            isConnected = false
+            pahoClient?.apply {
+                try { disconnect() } catch (_: Exception) {}
+                try { close() } catch (_: Exception) {}
+            }
+            pahoClient = null
         } catch (e: Exception) {
             Log.e(TAG, "断开MQTT连接异常", e)
         }

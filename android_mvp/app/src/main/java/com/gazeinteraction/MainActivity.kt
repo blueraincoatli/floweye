@@ -395,43 +395,96 @@ class MainActivity : AppCompatActivity(),
     }
 
     private fun showSettingsDialog() {
-        val themeNames = ThemeConfig.ALL.map { it.name }.toTypedArray()
-        val currentIdx = ThemeConfig.ALL.indexOf(currentTheme).coerceAtLeast(0)
-        val hostLabel = if (::hostManager.isInitialized && hostManager.forceHostMode) "开" else "关"
-        val options = arrayOf(
-            "切换主题",
-            "切换角色 (当前: ${if (deviceRole == "yes") "是" else "否"})",
-            "操作者模式: ${if (isOperatorMode) "开" else "关"}",
-            "强制主机模式: $hostLabel"
-        )
-        AlertDialog.Builder(this)
+        val view = layoutInflater.inflate(R.layout.dialog_settings, null)
+
+        // 主题
+        val themeValue = view.findViewById<TextView>(R.id.themeValue)
+        themeValue.text = currentTheme.name
+
+        // 角色
+        val roleValue = view.findViewById<TextView>(R.id.roleValue)
+        roleValue.text = if (deviceRole == "yes") "是" else "否"
+
+        // 操作者模式开关
+        val switchOperator = view.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switchOperator)
+        switchOperator.isChecked = isOperatorMode
+
+        // 强制主机开关
+        val switchForceHost = view.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switchForceHost)
+        switchForceHost.isChecked = ::hostManager.isInitialized && hostManager.forceHostMode
+
+        // 连接信息
+        val connInfo = view.findViewById<TextView>(R.id.connectionInfo)
+        if (::hostManager.isInitialized) {
+            connInfo.text = "角色: ${hostManager.role.name} | Broker: ${hostManager.getBrokerHost()}"
+        }
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle("设置")
-            .setItems(options) { _, which ->
-                when (which) {
-                    0 -> showThemePickerDialog(themeNames, currentIdx)
-                    1 -> showRoleSwitchDialog()
-                    2 -> {
-                        isOperatorMode = !isOperatorMode
-                        updateOperatorUI()
-                        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                            .edit().putBoolean(KEY_OPERATOR_MODE, isOperatorMode).apply()
-                    }
-                    3 -> {
-                        if (::hostManager.isInitialized) {
-                            hostManager.forceHostMode = !hostManager.forceHostMode
-                            hostManager.detectRole()
-                            if (hostManager.role == HostManager.Role.HOST) {
-                                startSelfHosted()
-                            }
-                            Toast.makeText(this,
-                                "主机模式: ${if (hostManager.forceHostMode) "开" else "关"}",
-                                Toast.LENGTH_SHORT).show()
-                        }
-                    }
+            .setView(view)
+            .setNegativeButton("关闭", null)
+            .create()
+
+        // 主题点击
+        view.findViewById<View>(R.id.settingTheme).setOnClickListener {
+            val themeNames = ThemeConfig.ALL.map { it.name }.toTypedArray()
+            val currentIdx = ThemeConfig.ALL.indexOf(currentTheme).coerceAtLeast(0)
+            showThemePickerDialog(themeNames, currentIdx)
+            themeValue.text = currentTheme.name
+        }
+
+        // 角色点击
+        view.findViewById<View>(R.id.settingRole).setOnClickListener {
+            showRoleSwitchDialog()
+            roleValue.text = if (deviceRole == "yes") "是" else "否"
+        }
+
+        // 操作者模式
+        switchOperator.setOnCheckedChangeListener { _, checked ->
+            isOperatorMode = checked
+            updateOperatorUI()
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(KEY_OPERATOR_MODE, isOperatorMode).apply()
+        }
+
+        // 强制主机模式
+        switchForceHost.setOnCheckedChangeListener { _, checked ->
+            if (!::hostManager.isInitialized) return@setOnCheckedChangeListener
+            hostManager.forceHostMode = checked
+            hostManager.detectRole()
+            if (checked) {
+                startSelfHosted()
+            } else {
+                // 关闭强制主机：停止自托管，重新连接
+                coordinatorEngine = null
+                brokerService?.stop()
+                brokerService = null
+                hostManager.detectRole()
+                // 重新连接 MQTT
+                if (::mqttClient.isInitialized) {
+                    mqttClient.disconnect()
+                    mqttClient.connect(hostManager.getBrokerHost(), hostManager.getBrokerPort())
                 }
             }
-            .setNegativeButton("关闭", null)
-            .show()
+            connInfo.text = "角色: ${hostManager.role.name} | Broker: ${hostManager.getBrokerHost()}"
+            // 同步角色到另一台设备
+            publishRoleSync(checked)
+        }
+
+        dialog.show()
+    }
+
+    private fun publishRoleSync(forceHost: Boolean) {
+        if (!::mqttClient.isInitialized || !mqttClient.isConnected()) return
+        try {
+            val data = mapOf(
+                "type" to "role_sync",
+                "action" to if (forceHost) "force_host" else "release_host",
+                "deviceId" to deviceId,
+                "timestamp" to System.currentTimeMillis()
+            )
+            mqttClient.publishRoleSync(data)
+        } catch (_: Exception) {}
     }
 
     private fun showThemePickerDialog(themeNames: Array<String>, currentIdx: Int) {
@@ -956,7 +1009,10 @@ class MainActivity : AppCompatActivity(),
             state.actionConsumed = false
             return
         }
-        if (state.actionConsumed) return
+        if (state.actionConsumed) {
+            Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) blocked: actionConsumed")
+            return
+        }
 
         // 播报阶段：阻止注视动作，持续重置状态
         if (engine.state == CoordinatorEngine.State.SCAN && engine.scanPhase == "announce") {
@@ -975,19 +1031,21 @@ class MainActivity : AppCompatActivity(),
         }
         state.isLooking = true
 
+        val duration = System.currentTimeMillis() - effectiveStartMs
         when (engine.state) {
             CoordinatorEngine.State.IDLE -> {
                 if (interpreter.evaluateWake(looking, confidence, effectiveStartMs)) {
-                    Log.i(TAG, "Remote gaze wake from $remoteDeviceId ($role)")
+                    Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) WAKE engineState=${engine.state}")
                     engine.handleAction("wake")
                     state.actionConsumed = true
                 }
             }
             CoordinatorEngine.State.SCAN -> {
                 val action = interpreter.evaluate(role, looking, confidence, effectiveStartMs)
+                Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) SCAN engineState=${engine.state} scanPhase=${engine.scanPhase} duration=${duration}ms conf=$confidence action=$action")
                 when (action) {
                     "select", "skip" -> {
-                        Log.i(TAG, "Remote gaze action from $remoteDeviceId ($role): $action")
+                        Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) -> handleAction('$action')")
                         engine.handleAction(action)
                         state.actionConsumed = true
                     }
@@ -998,15 +1056,23 @@ class MainActivity : AppCompatActivity(),
             }
             CoordinatorEngine.State.CONFIRM -> {
                 // TTS 播报阶段：不检测视线
-                if (isConfirmAnnouncing) return
+                if (isConfirmAnnouncing) {
+                    Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) CONFIRM blocked: isConfirmAnnouncing")
+                    return
+                }
+                Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) CONFIRM duration=${duration}ms")
                 if (role == "yes") {
                     val action = interpreter.evaluate("yes", looking, confidence, effectiveStartMs)
                     if (action == "select") {
+                        Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) -> handleAction('confirm')")
                         engine.handleAction("confirm")
                         state.actionConsumed = true
                     }
                 } else if (role == "no") {
-                    if (interpreter.evaluate("no", looking, confidence, effectiveStartMs) == "skip") {
+                    val action = interpreter.evaluate("no", looking, confidence, effectiveStartMs)
+                    Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) CONFIRM cancel eval: action=$action")
+                    if (action == "skip") {
+                        Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) -> handleAction('cancel')")
                         engine.handleAction("cancel")
                         state.actionConsumed = true
                     }
@@ -1114,6 +1180,7 @@ class MainActivity : AppCompatActivity(),
             if (json.has("lookingAtScreen")) {
                 val remoteDeviceId = json.optString("deviceId", "")
                 if (remoteDeviceId.isNotEmpty() && remoteDeviceId != deviceId) {
+                    Log.w(TAG, "[ROUTE] remote gaze from $remoteDeviceId role=${json.optString("role")} looking=${json.optBoolean("lookingAtScreen")} dur=${json.optLong("gazeDurationMs")}")
                     handleRemoteGaze(
                         remoteDeviceId,
                         json.optString("role", "yes"),
@@ -1121,6 +1188,31 @@ class MainActivity : AppCompatActivity(),
                         json.optDouble("confidence", 0.0).toFloat(),
                         json.optLong("gazeDurationMs", 0L)
                     )
+                }
+                return
+            }
+
+            // 角色同步消息
+            if (json.optString("type") == "role_sync") {
+                val action = json.optString("action", "")
+                val fromDeviceId = json.optString("deviceId", "")
+                Log.w(TAG, "[ROLE_SYNC] received $action from $fromDeviceId")
+                if (action == "force_host" && fromDeviceId != deviceId) {
+                    // 另一台设备开启了强制主机，本机自动退出
+                    runOnUiThread {
+                        if (::hostManager.isInitialized && hostManager.forceHostMode) {
+                            hostManager.forceHostMode = false
+                            hostManager.detectRole()
+                            coordinatorEngine = null
+                            brokerService?.stop()
+                            brokerService = null
+                            if (::mqttClient.isInitialized) {
+                                mqttClient.disconnect()
+                                mqttClient.connect(hostManager.getBrokerHost(), hostManager.getBrokerPort())
+                            }
+                            Toast.makeText(this, "已自动切换为副机", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
                 return
             }

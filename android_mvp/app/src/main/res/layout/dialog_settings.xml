@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- 主题选择 -->
+    <LinearLayout
+        android:id="@+id/settingTheme"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:background="?selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="切换主题"
+            android:textSize="16sp"
+            android:textColor="?android:textColorPrimary" />
+        <TextView
+            android:id="@+id/themeValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="?android:textColorSecondary" />
+    </LinearLayout>
+
+    <!-- 角色选择 -->
+    <LinearLayout
+        android:id="@+id/settingRole"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:background="?selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="切换角色"
+            android:textSize="16sp"
+            android:textColor="?android:textColorPrimary" />
+        <TextView
+            android:id="@+id/roleValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="?android:textColorSecondary" />
+    </LinearLayout>
+
+    <!-- 分隔线 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginVertical="8dp"
+        android:background="?android:textColorTertiary" />
+
+    <!-- 操作者模式 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="操作者模式"
+            android:textSize="16sp"
+            android:textColor="?android:textColorPrimary" />
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchOperator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <!-- 强制主机模式 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="强制主机"
+                android:textSize="16sp"
+                android:textColor="?android:textColorPrimary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="开启后本机运行协调引擎"
+                android:textSize="12sp"
+                android:textColor="?android:textColorTertiary" />
+        </LinearLayout>
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchForceHost"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <!-- 连接信息 -->
+    <TextView
+        android:id="@+id/connectionInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textSize="12sp"
+        android:textColor="?android:textColorTertiary" />
+
+</LinearLayout>
