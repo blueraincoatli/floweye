@@ -7,27 +7,28 @@
   "preferred_mode": "auto",
   "single_device": {
     "wake_gaze_seconds": 3.0,
-    "select_gaze_seconds": 1.5,
+    "select_gaze_seconds": 2.0,
     "emergency_gaze_seconds": 3.0,
-    "dwell_seconds": 10,
-    "max_dwell_seconds": 15,
-    "min_dwell_seconds": 5
+    "dwell_seconds": 15,
+    "max_dwell_seconds": 20,
+    "min_dwell_seconds": 8
   },
   "dual_device": {
-    "select_gaze_seconds": 1.5,
-    "skip_gaze_seconds": 0.5,
-    "hesitation_seconds": 0.3,
+    "select_gaze_seconds": 2.0,
+    "skip_gaze_seconds": 1.5,
+    "hesitation_seconds": 0.5,
     "emergency_triple_window_seconds": 5.0,
-    "dwell_seconds": 10,
-    "max_dwell_seconds": 15,
-    "min_dwell_seconds": 5
+    "dwell_seconds": 15,
+    "max_dwell_seconds": 20,
+    "min_dwell_seconds": 8
   },
   "tts": {
-    "rate": 150,
+    "rate": 130,
     "volume": 1.0,
     "night_volume": 0.4,
     "night_start_hour": 22,
-    "night_end_hour": 6
+    "night_end_hour": 6,
+    "repeat_count": 2
   },
   "adaptive": {
     "enabled": true,

@@ -53,9 +53,10 @@ class MainActivity : AppCompatActivity(),
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_THEME = "theme_name"
         private const val KEY_OPERATOR_MODE = "operator_mode"
+        private const val KEY_TTS_REPEAT = "tts_repeat_count"
         private const val MIN_CALIBRATION_SAMPLES = 10
         private const val PERCEPTION_PHASE_MS = 500L
-        private const val GAZE_SELECT_THRESHOLD_MS = 1500L
+        private const val GAZE_SELECT_THRESHOLD_MS = 2000L
     }
 
     private enum class ScreenState { IDLE, TRANSITION, SCAN, CONFIRM, FEEDBACK }
@@ -276,7 +277,15 @@ class MainActivity : AppCompatActivity(),
 
         try {
             val menuJson = assets.open("menu_config.json").bufferedReader().readText()
-            val patientJson = assets.open("patient_config.json").bufferedReader().readText()
+            var patientJson = assets.open("patient_config.json").bufferedReader().readText()
+            // 用用户设置的播报次数覆盖配置文件中的默认值
+            val ttsRepeat = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getInt(KEY_TTS_REPEAT, 2)
+            val patientObj = org.json.JSONObject(patientJson)
+            val ttsObj = patientObj.optJSONObject("tts") ?: org.json.JSONObject()
+            ttsObj.put("repeat_count", ttsRepeat)
+            patientObj.put("tts", ttsObj)
+            patientJson = patientObj.toString()
             coordinatorEngine = CoordinatorEngine(menuJson, patientJson)
             coordinatorEngine?.onDecision = { type, option ->
                 publishCoordinatorDecision(type, option)
@@ -289,20 +298,36 @@ class MainActivity : AppCompatActivity(),
                 ttsManager = AndroidTTSManager(this)
                 ttsManager?.initialize { }
                 ttsManager?.onSpeechDone = {
-                    coordinatorEngine?.onTtsComplete()
-                    // CONFIRM 状态 TTS 播完后，进入等待确认阶段
-                    if (coordinatorEngine?.state == CoordinatorEngine.State.CONFIRM && isConfirmAnnouncing) {
+                    // 处理 TTS 重复播报：返回 true 表示全部播完
+                    val allDone = coordinatorEngine?.onTtsUtteranceDone() ?: true
+                    pendingRemoteLatchClear = true
+                    // CONFIRM 状态：仅当所有重复播完后才显示按钮
+                    if (allDone && coordinatorEngine?.state == CoordinatorEngine.State.CONFIRM && isConfirmAnnouncing) {
                         isConfirmAnnouncing = false
+                        coordinatorEngine?.resetConfirmDwell()
                         runOnUiThread {
                             gazeStartTimeMs = System.currentTimeMillis()
                             localActionConsumed = false
                             updateUIForState()
                         }
+                        publishConfirmReady()
                     }
                 }
             }
 
-            gazeInterpreter = GazeInterpreter()
+            // 从 patient_config 读取注视参数
+            val patientConf = org.json.JSONObject(patientJson)
+            val dualCfg = patientConf.optJSONObject("dual_device")
+            val selectSec = dualCfg?.optDouble("select_gaze_seconds", 1.5)?.toFloat() ?: 1.5f
+            // skip 阈值下限 1.0s，低于此值容易因视线检测的固有噪声导致误触发
+            val skipSec = maxOf(
+                dualCfg?.optDouble("skip_gaze_seconds", 1.5)?.toFloat() ?: 1.5f,
+                1.0f
+            )
+            val wakeSec = dualCfg?.optDouble("wake_gaze_seconds",
+                patientConf.optJSONObject("single_device")?.optDouble("wake_gaze_seconds", 3.0) ?: 3.0
+            )?.toFloat() ?: 3.0f
+            gazeInterpreter = GazeInterpreter(selectSec, skipSec, wakeSec)
 
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 if (::mqttClient.isInitialized) {
@@ -343,6 +368,18 @@ class MainActivity : AppCompatActivity(),
                     data["optionLabel"] = option.optString("label", "")
                     data["ttsPrompt"] = option.optString("tts_prompt", "")
                 }
+                mqttClient.publishCoordinationMessage(data)
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun publishConfirmReady() {
+        try {
+            if (::mqttClient.isInitialized && mqttClient.isConnected()) {
+                val data = mapOf(
+                    "type" to "confirm_ready",
+                    "timestamp" to System.currentTimeMillis()
+                )
                 mqttClient.publishCoordinationMessage(data)
             }
         } catch (_: Exception) {}
@@ -469,6 +506,19 @@ class MainActivity : AppCompatActivity(),
             connInfo.text = "角色: ${hostManager.role.name} | Broker: ${hostManager.getBrokerHost()}"
             // 同步角色到另一台设备
             publishRoleSync(checked)
+        }
+
+        // 选项播报次数滑块
+        val sliderRepeat = view.findViewById<com.google.android.material.slider.Slider>(R.id.sliderRepeat)
+        val repeatValue = view.findViewById<TextView>(R.id.repeatValue)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedRepeat = prefs.getInt(KEY_TTS_REPEAT, 2)
+        sliderRepeat.value = savedRepeat.toFloat()
+        repeatValue.text = savedRepeat.toString()
+        sliderRepeat.addOnChangeListener { _, value, _ ->
+            val count = value.toInt()
+            repeatValue.text = count.toString()
+            prefs.edit().putInt(KEY_TTS_REPEAT, count).apply()
         }
 
         dialog.show()
@@ -895,6 +945,10 @@ class MainActivity : AppCompatActivity(),
 
     // 跟踪上一帧的引擎状态，状态切换时自动重置防抖
     private var lastCoordinatorState: CoordinatorEngine.State? = null
+    // 跟踪 scanPhase 切换（announce → select），重置远程注视状态
+    private var lastScanPhase: String = "select"
+    // TTS 回调中设置：announce 结束，需要清除远程注视 latch（线程安全：仅主线程写，MQTT线程读）
+    @Volatile private var pendingRemoteLatchClear = false
     // CONFIRM 两阶段：TTS 播报中（隐藏按钮/光环）→ TTS 完成后显示按钮开始检测
     private var isConfirmAnnouncing = false
 
@@ -1003,6 +1057,14 @@ class MainActivity : AppCompatActivity(),
             lastCoordinatorState = engine.state
         }
 
+        // 主动清除：TTS 完成时设置的 latch 清除标志
+        if (pendingRemoteLatchClear && engine.state == CoordinatorEngine.State.SCAN && engine.scanPhase == "select") {
+            state.actionConsumed = false
+            state.isLooking = false
+            state.gazeStartMs = System.currentTimeMillis()
+            pendingRemoteLatchClear = false
+        }
+
         // Debounce: reset on look-away, block until then
         if (!looking) {
             state.isLooking = false
@@ -1018,11 +1080,24 @@ class MainActivity : AppCompatActivity(),
         if (engine.state == CoordinatorEngine.State.SCAN && engine.scanPhase == "announce") {
             state.actionConsumed = false
             state.isLooking = false
+            lastScanPhase = "announce"
             return
         }
 
+        // 检测 scanPhase 是否刚从 announce 切换到 select
+        var skipClientDuration = false
+        if (engine.state == CoordinatorEngine.State.SCAN && engine.scanPhase != lastScanPhase) {
+            if (engine.scanPhase == "select") {
+                state.isLooking = false
+                state.actionConsumed = false
+                state.gazeStartMs = System.currentTimeMillis()
+                skipClientDuration = true
+            }
+        }
+        lastScanPhase = engine.scanPhase
+
         // 用副机消息中携带的注视时长反推起始时间，避免MQTT延迟导致的时长丢失
-        val effectiveStartMs = if (gazeDurationMs > 0) {
+        val effectiveStartMs = if (!skipClientDuration && gazeDurationMs > 0 && gazeDurationMs < 30000) {
             System.currentTimeMillis() - gazeDurationMs
         } else {
             // 兼容旧消息：从首次收到looking=true开始计时
@@ -1045,7 +1120,6 @@ class MainActivity : AppCompatActivity(),
                 Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) SCAN engineState=${engine.state} scanPhase=${engine.scanPhase} duration=${duration}ms conf=$confidence action=$action")
                 when (action) {
                     "select", "skip" -> {
-                        Log.w(TAG, "[REMOTE] $remoteDeviceId ($role) -> handleAction('$action')")
                         engine.handleAction(action)
                         state.actionConsumed = true
                     }
@@ -1188,6 +1262,9 @@ class MainActivity : AppCompatActivity(),
                         json.optDouble("confidence", 0.0).toFloat(),
                         json.optLong("gazeDurationMs", 0L)
                     )
+                } else {
+                    // 自己的消息或被过滤的消息
+                    Log.d(TAG, "[ROUTE] skip own gaze from $remoteDeviceId (myId=$deviceId)")
                 }
                 return
             }
@@ -1266,6 +1343,18 @@ class MainActivity : AppCompatActivity(),
                         gazeStatus.text = ""
                         updateUIForState()
                     }
+                    "confirm_ready" -> {
+                        // HOST 通知 CONFIRM TTS 播报完毕，显示按钮
+                        if (isConfirmAnnouncing) {
+                            isConfirmAnnouncing = false
+                            // 仅 CLIENT 需要响应此消息（HOST 已在 onSpeechDone 中处理）
+                            if (coordinatorEngine == null) {
+                                gazeStartTimeMs = System.currentTimeMillis()
+                                localActionConsumed = false
+                                updateUIForState()
+                            }
+                        }
+                    }
                     "action_feedback" -> {
                         val action = json.optString("action", "")
                         when (action) {
@@ -1330,15 +1419,19 @@ class MainActivity : AppCompatActivity(),
 
         lifecycleScope.launch {
             try {
+                val gazeDur = if (isLookingAtScreen) System.currentTimeMillis() - gazeStartTimeMs else 0L
                 val data = mapOf(
                     "deviceId" to deviceId,
                     "timestamp" to System.currentTimeMillis(),
                     "role" to deviceRole,
                     "lookingAtScreen" to isLookingAtScreen,
                     "confidence" to currentConfidence,
-                    "gazeDurationMs" to (if (isLookingAtScreen) System.currentTimeMillis() - gazeStartTimeMs else 0L),
+                    "gazeDurationMs" to gazeDur,
                     "calibrated" to (::gazeDetectionAlgorithm.isInitialized && gazeDetectionAlgorithm.isCalibrated())
                 )
+                if (isLookingAtScreen) {
+                    Log.d(TAG, "[PUB] role=$deviceRole looking=true dur=${gazeDur}ms conf=$currentConfidence")
+                }
                 mqttClient.publishGazeState(data)
             } catch (e: Exception) {
                 Log.e(TAG, "MQTT publish failed", e)

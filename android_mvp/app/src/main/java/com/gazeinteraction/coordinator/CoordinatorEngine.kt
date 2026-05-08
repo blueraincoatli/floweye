@@ -28,9 +28,14 @@ class CoordinatorEngine(
         private set
     private var scanGeneration: Int = 0
 
+    // TTS 重复播报控制
+    private var ttsRepeatRemaining = 0
+    private var ttsRepeatPrompt = ""
+    private var ttsRepeatDelayMs = 3000L
+    private var isConfirmAnnounce = false
+
     fun handleAction(action: String) {
         // 播报阶段忽略所有注视动作，避免误触发
-        // 仅在 SCAN 状态下生效：CONFIRM/IDLE 等状态不应被播报阶段阻挡
         if (state == State.SCAN && scanPhase == "announce") return
         when (action) {
             "wake" -> {
@@ -64,7 +69,27 @@ class CoordinatorEngine(
     private fun startAnnounce(opt: JSONObject) {
         scanPhase = "announce"
         onDecision?.invoke("announce", opt)
-        onTtsRequest?.invoke(opt.optString("tts_prompt", opt.optString("label", "")))
+        val prompt = opt.optString("tts_prompt", opt.optString("label", ""))
+        val repeatCount = config.optJSONObject("tts")?.optInt("repeat_count", 1) ?: 1
+        ttsRepeatPrompt = prompt
+        ttsRepeatRemaining = repeatCount - 1
+        isConfirmAnnounce = false
+        onTtsRequest?.invoke(prompt)
+    }
+
+    /** @return true 如果所有重复播报已完成 */
+    fun onTtsUtteranceDone(): Boolean {
+        if (ttsRepeatRemaining > 0) {
+            ttsRepeatRemaining--
+            Thread.sleep(ttsRepeatDelayMs)
+            onTtsRequest?.invoke(ttsRepeatPrompt)
+            return false  // 还有剩余播报
+        }
+        // 全部播完
+        if (!isConfirmAnnounce) {
+            onTtsComplete()  // SCAN → select
+        }
+        return true
     }
 
     fun onTtsComplete() {
@@ -85,7 +110,12 @@ class CoordinatorEngine(
             confirmOption = opt
             state = State.CONFIRM
             resetDwell()
-            onTtsRequest?.invoke("确认" + opt.optString("tts_prompt", opt.optString("label", "")))
+            val prompt = opt.optString("tts_prompt", opt.optString("label", ""))
+            val repeatCount = config.optJSONObject("tts")?.optInt("repeat_count", 1) ?: 1
+            ttsRepeatPrompt = prompt
+            ttsRepeatRemaining = repeatCount - 1
+            isConfirmAnnounce = true
+            onTtsRequest?.invoke("确认，" + prompt)
             onDecision?.invoke("confirm", opt)
         } else {
             // 进入子菜单，播报第一个选项
@@ -187,6 +217,7 @@ class CoordinatorEngine(
         return base * 1000
     }
 
-    private fun getConfirmTimeout(): Long = 5000L
+    private fun getConfirmTimeout(): Long = 20000L
     private fun resetDwell() { dwellStart = System.currentTimeMillis() }
+    fun resetConfirmDwell() { if (state == State.CONFIRM) resetDwell() }
 }
