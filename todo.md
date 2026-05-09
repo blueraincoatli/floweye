@@ -25,6 +25,10 @@
 - [x] CONFIRM 阶段副机"否"按钮修复（confirm_ready 消息通知）
 - [x] 患者参数调优（注视2s/跳过1.5s/唤醒2s/停留15s/TTS语速130）
 - [x] 配置文件同步（coordinator_app/ 与 Android assets/）
+- [x] 护理端微信推送（Server酱，三级分级通知：紧急/重要/一般）
+- [x] Telegram Bot 推送通道（国际用户支持）
+- [x] 多通道复合调度器（Server酱 + Telegram 可同时使用）
+- [x] 通知设置面板（通道选择 + SendKey + Bot Token + Chat ID + 测试按钮）
 
 ## 进行中
 
@@ -34,7 +38,6 @@
 
 - [ ] iOS 版本开发
 - [ ] 多设备 3+ 直接选择工程实现
-- [ ] 护理端 / Web 可视化界面
 - [ ] MQTT Broker 地址设置界面
 - [ ] TLS 加密通信
 - [ ] 临床场景测试

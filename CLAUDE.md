@@ -71,6 +71,8 @@ Android CLIENT (否) ──MQTT──────┘
                                  +-- MenuEngine (2层JSON配置)
                                  +-- AndroidTTSManager (TTS + 重复播报)
                                  +-- GazeInterpreter (视线参数可配置)
+                                 +-- ServerChanNotifier ──HTTPS──> Server酱 ──> 护理者微信
+                                 +-- TelegramNotifier ──HTTPS──> Telegram ──> 护理者 Bot
 ```
 
 ### PC 协调器模式
@@ -81,6 +83,7 @@ Android 设备 (是/否) ──MQTT──> Broker <──MQTT──> 扫描协�
                                                  +-- TTS 语音播报
                                                  +-- 自适应停留时间
                                                  +-- 紧急触发逻辑
+                                                 +-- notifier.py ──HTTPS──> Server酱/Telegram ──> 护理者手机
 ```
 
 ### MQTT 主题
@@ -95,6 +98,9 @@ Android 设备 (是/否) ──MQTT──> Broker <──MQTT──> 扫描协�
 2. 视线结果 -> MQTT（CLIENT 发布，HOST 订阅远程注视）
 3. 协调器: 菜单引擎 + 状态机 (IDLE/SCAN/CONFIRM/ALERT/WAITING) -> 决策
 4. 决策 -> MQTT -> 设备UI更新 + TTS播报
+5. 决策结果 -> CompositeNotifier -> HTTPS -> Server酱（微信）/ Telegram Bot -> 护理者手机
+6. 消息分级：紧急(critical)→红色标题、重要(high)→黄色标题、一般(normal)→普通消息
+7. 通知通道可在设置面板切换：Server酱 / Telegram / 两者同时
 
 ### 双设备视线处理
 - HOST 处理自己的本地注视（role=yes）和 CLIENT 的远程注视（role=no）
@@ -122,6 +128,10 @@ Android 设备 (是/否) ──MQTT──> Broker <──MQTT──> 扫描协�
 | `coordinator/BrokerService.kt` | 内嵌 MQTT Broker（Moquette） |
 | `coordinator/MenuEngine.kt` | 2层菜单导航引擎 |
 | `coordinator/AndroidTTSManager.kt` | TTS 管理器：队列、重复播报、播完回调 |
+| `coordinator/ServerChanNotifier.kt` | Server酱 微信推送：分级通知（紧急/重要/一般） |
+| `coordinator/TelegramNotifier.kt` | Telegram Bot 推送：国际用户通知通道 |
+| `coordinator/CompositeNotifier.kt` | 多通道调度器：同时分发到多个通知通道 |
+| `coordinator/CaregiverNotifier.kt` | 通知通道接口 |
 
 ### 协调器 (`coordinator_app/`)
 | 文件 | 职责 |
@@ -133,10 +143,12 @@ Android 设备 (是/否) ──MQTT──> Broker <──MQTT──> 扫描协�
 | `simulate_scanning_flow.py` | 模拟脚本：验证 single_select/dual_confirm/dual_skip/dual_emergency |
 | `test_scanning_coordinator.py` | 自动化测试（当前 8 passed） |
 | `gen.py` | 配置文件生成工具 |
+| `notifier.py` | 护理者通知模块：Server酱/Telegram 双通道 + 复合调度器 |
+| `notify_config.json` | 通知配置文件（channel + Server酱 + Telegram 参数） |
 
 ### Android UI 资源
 - `activity_main.xml` - 主布局（双按钮布局：是/否，进度条，状态栏）
-- `dialog_settings.xml` - 设置面板（主题、角色、操作者模式、强制主机、播报次数滑块）
+- `dialog_settings.xml` - 设置面板（主题、角色、操作者模式、强制主机、播报次数滑块、Server酱 SendKey）
 - `layout-land/` - 横屏适配
 - `debug_panel.xml` - 调试面板
 - `drawable/btn_*` - 按钮状态背景（注视/普通，是/否）
@@ -204,8 +216,8 @@ IDLE -> SCAN -> CONFIRM -> ALERT (或回到 SCAN/IDLE)
 ## 当前进度
 
 详细进度见 `todo.md`。核心状态：
-- **已完成**: Android MVP、视线检测、MQTT通信、双协调器、模拟联调、自动化测试、Android UI 重设计（光圈引导系统）、真机联调（华为 NOH-AN01）、自托管模式（CoordinatorEngine + 内嵌 Broker）、双设备视线 latch 修复、TTS 延迟重复播报（可配置1-3次，间隔3秒）、设置面板重构（含播报次数滑块）、患者参数调优（2s注视/1.5s跳过/15s停留）
+- **已完成**: Android MVP、视线检测、MQTT通信、双协调器、模拟联调、自动化测试、Android UI 重设计（光圈引导系统）、真机联调（华为 NOH-AN01）、自托管模式（CoordinatorEngine + 内嵌 Broker）、双设备视线 latch 修复、TTS 延迟重复播报（可配置1-3次，间隔3秒）、设置面板重构（含播报次数滑块）、患者参数调优（2s注视/1.5s跳过/15s停留）、**护理端微信推送（Server酱，三级分级通知）**
 - **进行中**: （无）
-- **待开始**: iOS 版本、3+设备直接选择、护理端 Web 界面、TLS、临床测试
+- **待开始**: iOS 版本、3+设备直接选择、TLS、临床测试
 
 **免责声明**: 本项目为研究和概念验证目的开发，请在实际医疗环境中使用前进行充分测试和验证。

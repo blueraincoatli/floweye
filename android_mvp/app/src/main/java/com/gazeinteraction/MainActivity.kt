@@ -40,7 +40,11 @@ import com.gazeinteraction.coordinator.BrokerService
 import com.gazeinteraction.coordinator.CoordinatorEngine
 import com.gazeinteraction.coordinator.HostManager
 import com.gazeinteraction.coordinator.AndroidTTSManager
+import com.gazeinteraction.coordinator.CaregiverNotifier
+import com.gazeinteraction.coordinator.CompositeNotifier
 import com.gazeinteraction.coordinator.GazeInterpreter
+import com.gazeinteraction.coordinator.ServerChanNotifier
+import com.gazeinteraction.coordinator.TelegramNotifier
 
 class MainActivity : AppCompatActivity(),
     FaceLandmarkerHelper.LandmarkerListener,
@@ -54,6 +58,10 @@ class MainActivity : AppCompatActivity(),
         private const val KEY_THEME = "theme_name"
         private const val KEY_OPERATOR_MODE = "operator_mode"
         private const val KEY_TTS_REPEAT = "tts_repeat_count"
+        private const val KEY_SERVERCHAN_SENDKEY = "serverchan_sendkey"
+        private const val KEY_TELEGRAM_BOT_TOKEN = "telegram_bot_token"
+        private const val KEY_TELEGRAM_CHAT_ID = "telegram_chat_id"
+        private const val KEY_NOTIFY_CHANNEL = "notify_channel"  // "serverchan" | "telegram" | "both"
         private const val MIN_CALIBRATION_SAMPLES = 10
         private const val PERCEPTION_PHASE_MS = 500L
         private const val GAZE_SELECT_THRESHOLD_MS = 2000L
@@ -287,6 +295,7 @@ class MainActivity : AppCompatActivity(),
             patientObj.put("tts", ttsObj)
             patientJson = patientObj.toString()
             coordinatorEngine = CoordinatorEngine(menuJson, patientJson)
+            coordinatorEngine?.notifier = buildNotifier()
             coordinatorEngine?.onDecision = { type, option ->
                 publishCoordinatorDecision(type, option)
             }
@@ -383,6 +392,31 @@ class MainActivity : AppCompatActivity(),
                 mqttClient.publishCoordinationMessage(data)
             }
         } catch (_: Exception) {}
+    }
+
+    private fun buildNotifier(): CaregiverNotifier {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val channel = prefs.getString(KEY_NOTIFY_CHANNEL, "serverchan") ?: "serverchan"
+        val channels = mutableListOf<CaregiverNotifier>()
+
+        if (channel == "serverchan" || channel == "both") {
+            val key = prefs.getString(KEY_SERVERCHAN_SENDKEY, "") ?: ""
+            if (key.isNotBlank()) channels.add(ServerChanNotifier(key))
+        }
+        if (channel == "telegram" || channel == "both") {
+            val token = prefs.getString(KEY_TELEGRAM_BOT_TOKEN, "") ?: ""
+            val chatId = prefs.getString(KEY_TELEGRAM_CHAT_ID, "") ?: ""
+            if (token.isNotBlank() && chatId.isNotBlank())
+                channels.add(TelegramNotifier(token, chatId))
+        }
+
+        // 兼容旧版：无 channel 设置但有 sendKey 时自动启用 ServerChan
+        if (channels.isEmpty()) {
+            val legacyKey = prefs.getString(KEY_SERVERCHAN_SENDKEY, "") ?: ""
+            if (legacyKey.isNotBlank()) channels.add(ServerChanNotifier(legacyKey))
+        }
+
+        return CompositeNotifier(channels)
     }
 
     @Suppress("UNUSED_PARAMETER")
@@ -519,6 +553,64 @@ class MainActivity : AppCompatActivity(),
             val count = value.toInt()
             repeatValue.text = count.toString()
             prefs.edit().putInt(KEY_TTS_REPEAT, count).apply()
+        }
+
+        // ── 护理者通知设置 ──
+        val channelValue = view.findViewById<TextView>(R.id.channelValue)
+        val sendKeyInput = view.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.sendKeyInput)
+        val tgTokenInput = view.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.tgTokenInput)
+        val tgChatIdInput = view.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.tgChatIdInput)
+        val testNotifyBtn = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.testNotifyBtn)
+
+        val savedChannel = prefs.getString(KEY_NOTIFY_CHANNEL, "serverchan") ?: "serverchan"
+        channelValue.text = when (savedChannel) {
+            "telegram" -> "Telegram"
+            "both" -> "Server酱 + Telegram"
+            else -> "Server酱"
+        }
+        sendKeyInput.setText(prefs.getString(KEY_SERVERCHAN_SENDKEY, "") ?: "")
+        tgTokenInput.setText(prefs.getString(KEY_TELEGRAM_BOT_TOKEN, "") ?: "")
+        tgChatIdInput.setText(prefs.getString(KEY_TELEGRAM_CHAT_ID, "") ?: "")
+
+        view.findViewById<View>(R.id.settingNotifyChannel).setOnClickListener {
+            val options = arrayOf("Server酱（微信）", "Telegram", "Server酱 + Telegram")
+            val values = arrayOf("serverchan", "telegram", "both")
+            val currentIdx = values.indexOf(savedChannel).coerceAtLeast(0)
+            AlertDialog.Builder(this)
+                .setTitle("选择通知通道")
+                .setSingleChoiceItems(options, currentIdx) { d, which ->
+                    prefs.edit().putString(KEY_NOTIFY_CHANNEL, values[which]).apply()
+                    channelValue.text = options[which]
+                    // 立即更新协调引擎
+                    coordinatorEngine?.notifier = buildNotifier()
+                    d.dismiss()
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+
+        testNotifyBtn.setOnClickListener {
+            // 保存所有字段
+            prefs.edit()
+                .putString(KEY_SERVERCHAN_SENDKEY, sendKeyInput.text.toString().trim())
+                .putString(KEY_TELEGRAM_BOT_TOKEN, tgTokenInput.text.toString().trim())
+                .putString(KEY_TELEGRAM_CHAT_ID, tgChatIdInput.text.toString().trim())
+                .apply()
+            coordinatorEngine?.notifier = buildNotifier()
+            val notifier = buildNotifier()
+            testNotifyBtn.isEnabled = false
+            testNotifyBtn.text = "发送中..."
+            notifier.sendTest { success ->
+                runOnUiThread {
+                    testNotifyBtn.isEnabled = true
+                    testNotifyBtn.text = "发送测试"
+                    Toast.makeText(
+                        this,
+                        if (success) "测试消息已发送" else "发送失败，请检查配置和网络",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
 
         dialog.show()

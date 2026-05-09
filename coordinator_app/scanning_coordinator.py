@@ -19,6 +19,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import paho.mqtt.client as mqtt
 
+from notifier import create_notifier, CompositeNotifier
+
 
 def _configure_stdio() -> None:
     for stream_name in ("stdout", "stderr"):
@@ -539,6 +541,8 @@ class ScanningCoordinator:
         self.tts = TTSEngine(self.config)
         self.gaze = GazeInterpreter(self.config)
         self.device_mgr = DeviceManager()
+        _notify_cfg = os.path.join(os.path.dirname(os.path.abspath(__file__)), "notify_config.json")
+        self.notifier: CompositeNotifier = create_notifier(_notify_cfg)
 
         self._state = State.IDLE
         self._state_lock = threading.Lock()
@@ -944,6 +948,16 @@ class ScanningCoordinator:
         self._update_dwell(response_time)
         label = option.get("label", "")
         threading.Thread(target=lambda: self.tts.speak(f"已通知{label}"), daemon=True).start()
+        # Server酱 微信推送
+        self._notify_caregiver(urgency, label)
+
+    def _notify_caregiver(self, urgency: str, label: str) -> None:
+        if urgency == "critical":
+            self.notifier.send_emergency(label)
+        elif urgency == "high":
+            self.notifier.send_important(label)
+        else:
+            self.notifier.send_normal(label)
 
     def _skip_current(self) -> None:
         logger.info("[SKIP] Skipped current option by 'no' device gaze")

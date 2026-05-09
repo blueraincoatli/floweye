@@ -21,6 +21,7 @@ class CoordinatorEngine(
         private set
     var onTtsRequest: ((String) -> Unit)? = null
     var onDecision: ((String, JSONObject?) -> Unit)? = null
+    var notifier: CaregiverNotifier? = null
     val currentDepth: Int get() = menuEngine.currentDepth
 
     // Two-phase scan: "announce" = TTS播报中(只显示选项文字), "select" = 等待用户选择(显示是/否)
@@ -136,6 +137,10 @@ class CoordinatorEngine(
         onDecision?.invoke("executed", opt)
         state = State.WAITING
         resetDwell()
+        // Server酱 微信推送
+        val label = opt.optString("label", "")
+        val urgency = opt.optString("urgency", "normal")
+        notifyCaregiver(urgency, label)
     }
 
     private fun handleSkip() {
@@ -161,6 +166,16 @@ class CoordinatorEngine(
         onTtsRequest?.invoke("紧急呼叫")
         onDecision?.invoke("emergency", null)
         resetDwell()
+        notifier?.sendEmergency("紧急呼叫")
+    }
+
+    private fun notifyCaregiver(urgency: String, label: String) {
+        val n = notifier ?: return
+        when (urgency) {
+            "critical" -> n.sendEmergency(label)
+            "high" -> n.sendImportant(label)
+            else -> n.sendNormal(label)
+        }
     }
 
     fun tick() {

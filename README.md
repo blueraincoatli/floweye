@@ -30,6 +30,7 @@
 - PC 协调器模式保留为备用
 - 已验证四种场景：单设备选择、双设备确认、双设备跳过、紧急呼叫
 - 协调器自动化测试 `8 passed`
+- 护理者微信推送已实现（Server酱，三级分级通知）
 - 硬编码参数：注视选中 2s、跳过 1.5s、唤醒 2s、选项停留 15s、播报重复 2 遍（间隔 3s）
 
 ### 系统架构
@@ -38,13 +39,32 @@
 Android HOST (是) ──内嵌 Broker──┐
                                  ├── CoordinatorEngine
 Android CLIENT (否) ──MQTT──────┘
-                                 |
+                                 │
                                  +-- MenuEngine (2层JSON菜单)
                                  +-- AndroidTTSManager (重复播报)
                                  +-- GazeInterpreter (可配置阈值)
+                                 +-- ServerChanNotifier ──HTTPS──> Server酱 ──> 护理者微信
+                                 +-- TelegramNotifier ──HTTPS──> Telegram ──> 护理者 Bot
 ```
 
-两台手机面对面或并排放置。HOST 显示"是"，CLIENT 显示"否"。患者注视对应屏幕，HOST 统一处理视线信号并做出决策，通过 TTS 语音播报最终选项。
+两台手机面对面或并排放置。HOST 显示"是"，CLIENT 显示"否"。患者注视对应屏幕，HOST 统一处理视线信号并做出决策，通过 TTS 语音播报最终选项，同时通过 Server酱 将选择结果推送到护理者微信。
+
+### 护理者通知
+
+患者做出选择后，系统通过 [Server酱](https://sct.ftqq.com/) 将消息实时推送到护理者微信（「方糖」服务号），无需安装任何 App。也支持 Telegram Bot 作为国际用户通道，两者可同时使用。
+
+配置步骤：
+1. 注册 Server酱 获取 SendKey（或创建 Telegram Bot 获取 Token + Chat ID）
+2. 护理者微信扫码关注「方糖」服务号（或 Telegram 上关注 Bot）
+3. 在 Android 设置面板或 `coordinator_app/notify_config.json` 中填入配置，选择通道
+
+消息按紧急程度分为三级：
+
+| 级别 | 触发条件 | 微信推送 |
+|------|---------|---------|
+| 紧急 | 紧急呼叫、胸闷 | 红色标题「患者紧急呼叫！」 |
+| 重要 | 头疼、伤口疼、想翻身等 | 黄色标题「患者请求帮助」 |
+| 一般 | 想喝水、太热了等 | 普通消息 |
 
 ### 快速开始
 
@@ -87,7 +107,13 @@ floweye3/
       BrokerService.kt             # 内嵌 MQTT Broker
       MenuEngine.kt                # 2层菜单导航
       AndroidTTSManager.kt         # TTS 队列 + 重复播报
+      ServerChanNotifier.kt        # Server酱 微信推送
+      TelegramNotifier.kt          # Telegram Bot 推送
+      CompositeNotifier.kt         # 多通道调度器
+      CaregiverNotifier.kt         # 通知接口
   coordinator_app/                 # Python 协调器（PC 模式备用）
+    notifier.py                    # 通知模块：Server酱 + Telegram + 复合调度
+    notify_config.json             # 通知配置（通道选择 + SendKey + Bot Token）
   docs/                            # 设计文档与状态
 ```
 
@@ -150,7 +176,25 @@ This project attempts to use **two camera-equipped phones + mounts** (HOST must 
 - Self-hosted mode: one phone as HOST (embedded MQTT Broker + coordination engine), the other as CLIENT. No PC required
 - Four interaction scenarios verified: single-select, dual-confirm, dual-skip, emergency
 - Coordinator tests: `8 passed`
+- Caregiver WeChat push notification implemented (ServerChan, 3-tier urgency)
 - Timing defaults: select gaze 2s, skip 1.5s, wake 2s, dwell 15s, TTS repeats 2× (3s interval)
+
+### Caregiver Notification
+
+When a patient makes a selection, the system pushes a real-time notification to the caregiver via [ServerChan](https://sct.ftqq.com/) (WeChat, for users in China) or a Telegram Bot (for international users). Both channels can be used simultaneously.
+
+Setup:
+1. ServerChan: register to get a SendKey, caregiver follows the "方糖" WeChat Official Account. Telegram: create a bot via @BotFather, caregiver sends /start to the bot, then retrieve the chat_id.
+2. Enter the credentials in the Android settings panel or `coordinator_app/notify_config.json`
+3. Select the channel mode: serverchan, telegram, or both
+
+Three urgency levels:
+
+| Level | Trigger | WeChat Message |
+|-------|---------|----------------|
+| Emergency | Emergency call, chest tightness | "Patient Emergency Call!" (red) |
+| Important | Pain, repositioning, toilet needs | "Patient Needs Help" (yellow) |
+| Normal | Water, temperature, etc. | Plain info message |
 
 ### Quick Start (Self-Hosted)
 

@@ -1,0 +1,14 @@
+{
+    "channel": "serverchan",
+    "_comment_channel": "可选: serverchan | telegram | both",
+    "serverchan": {
+        "send_key": "SCT347246TmkjlnPFm0XRSNxzIuDbq9wYi",
+        "_comment": "在 https://sct.ftqq.com/ 注册获取 SendKey。护理者扫码关注方糖服务号。"
+    },
+    "telegram": {
+        "bot_token": "",
+        "chat_id": "",
+        "_comment": "1. 在 Telegram 找 @BotFather 创建 Bot 获取 token",
+        "_comment2": "2. 让护理者给 Bot 发 /start，然后访问 https://api.telegram.org/bot{token}/getUpdates 获取 chat_id"
+    }
+}
